@@ -1,41 +1,7 @@
 import { useEffect, useState } from "react";
+import { api, ORDER_STATUS_LABELS, type OrderStatus, type StoredOrder } from "../lib/api";
 import { faDigits, formatToman } from "../lib/utils";
 import { CheckIcon, CloseIcon, PackageIcon, StoreIcon, TruckIcon } from "./icons";
-
-export interface StoredOrder {
-  code: string;
-  date: string;
-  name: string;
-  phone: string;
-  shippingLabel: string;
-  paymentLabel: string;
-  items: { name: string; qty: number; price: number }[];
-  subtotal: number;
-  discount: number;
-  shippingCost: number;
-  total: number;
-}
-
-const ORDERS_KEY = "atash-o-daneh-orders";
-
-export function saveOrder(order: StoredOrder) {
-  try {
-    const list = getOrders();
-    localStorage.setItem(ORDERS_KEY, JSON.stringify([order, ...list].slice(0, 20)));
-  } catch {
-    /* حافظه‌ی مرورگر در دسترس نیست */
-  }
-}
-
-export function getOrders(): StoredOrder[] {
-  try {
-    const raw = localStorage.getItem(ORDERS_KEY);
-    const parsed = raw ? (JSON.parse(raw) as StoredOrder[]) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 interface Props {
   open: boolean;
@@ -43,18 +9,22 @@ interface Props {
   onGoShop: () => void;
 }
 
-const TIMELINE = [
-  { label: "ثبت سفارش", icon: CheckIcon, done: true },
-  { label: "آماده‌سازی", icon: PackageIcon, active: true },
-  { label: "ارسال", icon: TruckIcon, done: false },
-  { label: "تحویل", icon: StoreIcon, done: false },
+const TIMELINE: { label: string; icon: typeof CheckIcon }[] = [
+  { label: "ثبت سفارش", icon: CheckIcon },
+  { label: "آماده‌سازی", icon: PackageIcon },
+  { label: "ارسال", icon: TruckIcon },
+  { label: "تحویل", icon: StoreIcon },
 ];
+
+/** ایندکس مرحله‌ی فعال بر اساس وضعیت سفارش */
+const statusStep = (s: OrderStatus): number =>
+  s === "preparing" ? 1 : s === "shipping" ? 2 : 3;
 
 export default function OrderHistory({ open, onClose, onGoShop }: Props) {
   const [orders, setOrders] = useState<StoredOrder[]>([]);
 
   useEffect(() => {
-    if (open) setOrders(getOrders());
+    if (open) setOrders(api.getOrders());
   }, [open]);
 
   useEffect(() => {
@@ -127,84 +97,100 @@ export default function OrderHistory({ open, onClose, onGoShop }: Props) {
             </div>
           ) : (
             <ul className="space-y-4">
-              {orders.map((o, idx) => (
-                <li
-                  key={o.code}
-                  className="animate-fade-up rounded-xl border border-roast-900/10 bg-cream-50 p-5 shadow-card"
-                  style={{ animationDelay: `${idx * 0.08}s` }}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <span className="font-display rounded-lg bg-roast-900 px-3 py-1.5 text-lg tracking-[0.12em] text-gold-400">
-                        {o.code}
-                      </span>
-                      <span className="text-xs font-semibold text-roast-600">{o.date}</span>
-                    </div>
-                    <span className="flex items-center gap-1.5 rounded-full bg-gold-500/15 px-3 py-1.5 text-[11px] font-bold text-gold-700">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold-600 opacity-60" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-gold-600" />
-                      </span>
-                      در حال آماده‌سازی
-                    </span>
-                  </div>
-
-                  {/* تایم‌لاین وضعیت */}
-                  <ol className="mt-4 flex items-center">
-                    {TIMELINE.map((step, i) => (
-                      <li key={step.label} className="flex flex-1 items-center last:flex-none">
-                        <span className="flex flex-col items-center gap-1.5">
-                          <span
-                            className={`grid h-8 w-8 place-items-center rounded-full border-2 transition-colors ${
-                              step.done
-                                ? "border-olive-600 bg-olive-600 text-cream-50"
-                                : step.active
-                                  ? "border-gold-600 bg-gold-500/20 text-gold-700"
-                                  : "border-roast-900/15 bg-cream-100 text-roast-900/35"
-                            }`}
-                          >
-                            <step.icon className="h-3.5 w-3.5" />
-                          </span>
-                          <span
-                            className={`text-[10px] font-bold ${
-                              step.done ? "text-olive-600" : step.active ? "text-gold-700" : "text-roast-900/40"
-                            }`}
-                          >
-                            {step.label}
-                          </span>
+              {orders.map((o, idx) => {
+                const step = statusStep(o.status);
+                const delivered = o.status === "delivered";
+                return (
+                  <li
+                    key={o.code}
+                    className="animate-fade-up rounded-xl border border-roast-900/10 bg-cream-50 p-5 shadow-card"
+                    style={{ animationDelay: `${idx * 0.08}s` }}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="font-display rounded-lg bg-roast-900 px-3 py-1.5 text-lg tracking-[0.12em] text-gold-400">
+                          {o.code}
                         </span>
-                        {i < TIMELINE.length - 1 && (
+                        <span className="text-xs font-semibold text-roast-600">{o.date}</span>
+                      </div>
+                      <span
+                        className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold ${
+                          delivered ? "bg-olive-600/15 text-olive-700" : "bg-gold-500/15 text-gold-700"
+                        }`}
+                      >
+                        <span className="relative flex h-2 w-2">
+                          {!delivered && (
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold-600 opacity-60" />
+                          )}
                           <span
-                            className={`mx-1 mb-5 h-0.5 flex-1 rounded-full ${
-                              TIMELINE[i + 1].done || step.done ? "bg-olive-600/60" : "bg-roast-900/10"
-                            }`}
+                            className={`relative inline-flex h-2 w-2 rounded-full ${delivered ? "bg-olive-600" : "bg-gold-600"}`}
                           />
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-
-                  <ul className="mt-4 space-y-1.5 border-t border-dashed border-roast-900/15 pt-3.5">
-                    {o.items.map((it) => (
-                      <li key={it.name} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="truncate text-roast-700">
-                          {it.name} <strong className="text-roast-900">× {faDigits(it.qty)}</strong>
                         </span>
-                        <span className="whitespace-nowrap font-bold text-roast-900">
-                          {formatToman(it.price * it.qty)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                        {ORDER_STATUS_LABELS[o.status]}
+                      </span>
+                    </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-roast-900/15 pt-3.5 text-xs text-roast-600">
-                    <span>
-                      {o.shippingLabel} · {o.paymentLabel}
-                    </span>
-                    <span className="text-sm font-extrabold text-gold-700">{formatToman(o.total)}</span>
-                  </div>
-                </li>
-              ))}
+                    {/* تایم‌لاین وضعیت */}
+                    <ol className="mt-4 flex items-center">
+                      {TIMELINE.map((t, i) => {
+                        const done = i < step || delivered;
+                        const active = i === step && !delivered;
+                        return (
+                          <li key={t.label} className="flex flex-1 items-center last:flex-none">
+                            <span className="flex flex-col items-center gap-1.5">
+                              <span
+                                className={`grid h-8 w-8 place-items-center rounded-full border-2 transition-colors ${
+                                  done
+                                    ? "border-olive-600 bg-olive-600 text-cream-50"
+                                    : active
+                                      ? "border-gold-600 bg-gold-500/20 text-gold-700"
+                                      : "border-roast-900/15 bg-cream-100 text-roast-900/35"
+                                }`}
+                              >
+                                <t.icon className="h-3.5 w-3.5" />
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  done ? "text-olive-600" : active ? "text-gold-700" : "text-roast-900/40"
+                                }`}
+                              >
+                                {t.label}
+                              </span>
+                            </span>
+                            {i < TIMELINE.length - 1 && (
+                              <span
+                                className={`mx-1 mb-5 h-0.5 flex-1 rounded-full ${
+                                  i < step || delivered ? "bg-olive-600/60" : "bg-roast-900/10"
+                                }`}
+                              />
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
+
+                    <ul className="mt-4 space-y-1.5 border-t border-dashed border-roast-900/15 pt-3.5">
+                      {o.items.map((it) => (
+                        <li key={it.name} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate text-roast-700">
+                            {it.name} <strong className="text-roast-900">× {faDigits(it.qty)}</strong>
+                          </span>
+                          <span className="whitespace-nowrap font-bold text-roast-900">
+                            {formatToman(it.price * it.qty)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-roast-900/15 pt-3.5 text-xs text-roast-600">
+                      <span>
+                        {o.shippingLabel} · {o.paymentLabel}
+                      </span>
+                      <span className="text-sm font-extrabold text-gold-700">{formatToman(o.total)}</span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

@@ -1,153 +1,98 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import CartDrawer, { type CartItem } from "./components/CartDrawer";
-import OrderHistory from "./components/OrderHistory";
-import Checkout from "./components/Checkout";
+import { useEffect, useMemo, useState } from "react";
+import {
+  HashRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import AccountPage from "./components/AccountPage";
+import AdminPage from "./components/AdminPage";
+import CheckoutPage from "./components/Checkout";
+import ChatWidget from "./components/ChatWidget";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import Home from "./components/Home";
 import ProductDetail from "./components/ProductDetail";
-import { BeanIcon, CheckIcon, CloseIcon } from "./components/icons";
-import { CATEGORY_LABELS, PRODUCTS, type CategoryId, type Product, type SortKey } from "./data/products";
+import { BeanIcon, CupIcon } from "./components/icons";
+import { CATEGORY_LABELS, type CategoryId, type SortKey } from "./data/products";
 import { usePersistentCart } from "./lib/hooks";
+import { ShopProvider, useShop } from "./lib/shop-context";
 import { normalizeFa } from "./lib/utils";
 
-type View = { type: "home" } | { type: "product"; id: string } | { type: "checkout" };
-type ToastKind = "success" | "error" | "info";
-interface Toast {
-  id: number;
-  message: string;
-  kind: ToastKind;
+/* ═══════════ بارگذار صفحه ═══════════ */
+function PageLoader() {
+  return (
+    <div className="grid min-h-[50dvh] place-items-center">
+      <div className="text-center">
+        <span className="relative mx-auto grid h-20 w-20 place-items-center text-gold-700">
+          <span className="absolute inset-0 animate-spin rounded-full border-4 border-gold-500/20 border-t-gold-600" />
+          <CupIcon className="h-9 w-9" />
+        </span>
+        <p className="font-display mt-5 text-xl text-roast-900">در حال دم‌آوری صفحه…</p>
+      </div>
+    </div>
+  );
 }
 
-const MAX_QTY = 10;
+/* ═══════════ صفحه‌ی ۴۰۴ ═══════════ */
+function NotFound() {
+  const navigate = useNavigate();
+  return (
+    <div className="animate-fade-up mx-auto max-w-md px-4 py-24 text-center">
+      <BeanIcon className="animate-floaty mx-auto h-16 w-16 rotate-45 text-gold-600" />
+      <h1 className="font-display mt-6 text-6xl text-roast-900">۴۰۴</h1>
+      <p className="font-display mt-2 text-2xl text-gold-700">این صفحه پیدا نشد!</p>
+      <p className="mx-auto mt-4 max-w-xs text-sm leading-8 text-roast-600">
+        به‌نظر می‌رسد این مسیر هنوز برشت نشده. بیایید به فروشگاه برگردیم.
+      </p>
+      <button
+        onClick={() => navigate("/")}
+        className="mt-8 rounded-full bg-gold-600 px-8 py-3.5 text-sm font-bold text-roast-950 transition-all hover:bg-gold-500 active:scale-95"
+      >
+        بازگشت به صفحه‌ی اصلی
+      </button>
+    </div>
+  );
+}
 
-export default function App() {
-  const [view, setView] = useState<View>({ type: "home" });
-  const [cart, setCart] = usePersistentCart();
-  const [cartOpen, setCartOpen] = useState(false);
-  const [ordersOpen, setOrdersOpen] = useState(false);
-  const [query, setQuery] = useState("");
+/* ═══════════ صفحه‌ی اصلی ═══════════ */
+function HomePage() {
+  const { products, productsLoading, addToCart, wishlist, toggleWishlist, pushToast, query, setQuery } = useShop();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [category, setCategory] = useState<CategoryId | "all">("all");
   const [sort, setSort] = useState<SortKey>("popular");
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const toastId = useRef(0);
 
-  /* ───── اعلان‌ها ───── */
-  const pushToast = useCallback((message: string, kind: ToastKind = "success") => {
-    const id = ++toastId.current;
-    setToasts((t) => [...t, { id, message, kind }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3400);
-  }, []);
-
-  /* ───── ناوبری ───── */
-  const goHome = useCallback(() => {
-    setView({ type: "home" });
-    window.scrollTo({ top: 0 });
-  }, []);
-
-  const scrollToSection = useCallback(
-    (id: string) => {
-      const doScroll = () => {
-        if (id === "top") {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          return;
-        }
-        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      };
-      if (view.type !== "home") {
-        setView({ type: "home" });
-        window.setTimeout(doScroll, 120);
-      } else {
-        doScroll();
-      }
-    },
-    [view.type],
-  );
-
-  const openProduct = useCallback((id: string) => {
-    setView({ type: "product", id });
-    window.scrollTo({ top: 0 });
-  }, []);
-
-  const goCheckout = useCallback(() => {
-    setCartOpen(false);
-    setView({ type: "checkout" });
-    window.scrollTo({ top: 0 });
-  }, []);
-
-  /* ───── سبد خرید ───── */
-  const addToCart = useCallback(
-    (product: Product, qty = 1, openDrawer = false) => {
-      setCart((prev) => {
-        const existing = prev.find((l) => l.id === product.id);
-        if (existing) {
-          return prev.map((l) =>
-            l.id === product.id ? { ...l, qty: Math.min(MAX_QTY, l.qty + qty) } : l,
-          );
-        }
-        return [...prev, { id: product.id, qty: Math.min(MAX_QTY, qty) }];
-      });
-      pushToast(`«${product.shortName}» به سبد خرید اضافه شد`);
-      if (openDrawer) setCartOpen(true);
-    },
-    [pushToast, setCart],
-  );
-
-  const setLineQty = useCallback(
-    (id: string, qty: number) => {
-      if (qty < 1) {
-        setCart((prev) => prev.filter((l) => l.id !== id));
-        pushToast("محصول از سبد حذف شد", "info");
-        return;
-      }
-      setCart((prev) => prev.map((l) => (l.id === id ? { ...l, qty: Math.min(MAX_QTY, qty) } : l)));
-    },
-    [pushToast, setCart],
-  );
-
-  const removeLine = useCallback(
-    (id: string) => {
-      setCart((prev) => prev.filter((l) => l.id !== id));
-      pushToast("محصول از سبد حذف شد", "info");
-    },
-    [pushToast, setCart],
-  );
-
-  const clearCart = useCallback(() => {
-    setCart([]);
-    pushToast("سبد خرید تخلیه شد", "info");
-  }, [pushToast, setCart]);
-
-  const cartItems: CartItem[] = useMemo(
-    () =>
-      cart
-        .map((l) => ({ product: PRODUCTS.find((p) => p.id === l.id), qty: l.qty }))
-        .filter((i): i is CartItem => Boolean(i.product)),
-    [cart],
-  );
-  const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
-  const subtotal = cartItems.reduce((s, i) => s + i.qty * i.product.price, 0);
-
-  /* ───── جستجو، فیلتر و مرتب‌سازی ───── */
-  const changeQuery = useCallback(
-    (q: string) => {
-      setQuery(q);
-      if (view.type !== "home") setView({ type: "home" });
-    },
-    [view.type],
-  );
-
-  const selectCategory = useCallback((id: CategoryId | "all") => {
-    setCategory(id);
-  }, []);
+  /* اسکرول به بخش یا اعمال دسته از state ناوبری */
+  useEffect(() => {
+    const state = location.state as { scrollTo?: string; category?: CategoryId | "all" } | null;
+    if (!state) return;
+    if (state.category) setCategory(state.category);
+    if (state.scrollTo) {
+      window.setTimeout(() => {
+        document.getElementById(state.scrollTo!)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 130);
+    }
+    navigate(location.pathname, { replace: true });
+  }, [location.state, location.pathname, navigate]);
 
   const filtered = useMemo(() => {
-    let list = PRODUCTS.filter((p) => category === "all" || p.category === category);
+    let list = products.filter((p) => category === "all" || p.category === category);
     const q = normalizeFa(query);
     if (q) {
       list = list.filter((p) =>
         normalizeFa(
-          [p.name, CATEGORY_LABELS[p.category], p.description, p.details.origin, p.details.roastLevel, p.details.tastingNotes.join(" ")].join(" "),
+          [
+            p.name,
+            CATEGORY_LABELS[p.category],
+            p.description,
+            p.details.origin,
+            p.details.roastLevel,
+            p.details.tastingNotes.join(" "),
+          ].join(" "),
         ).includes(q),
       );
     }
@@ -163,128 +108,98 @@ export default function App() {
           return b.popularity - a.popularity;
       }
     });
-  }, [query, category, sort]);
+  }, [products, query, category, sort]);
 
-  const currentProduct =
-    view.type === "product" ? PRODUCTS.find((p) => p.id === view.id) : undefined;
+  return (
+    <Home
+      products={filtered}
+      loading={productsLoading}
+      query={query}
+      onQueryChange={setQuery}
+      category={category}
+      onCategoryChange={setCategory}
+      sort={sort}
+      onSortChange={setSort}
+      onOpenProduct={(id) => navigate(`/product/${id}`)}
+      onAddToCart={(p) => addToCart(p)}
+      onNav={(id) => navigate("/", { state: { scrollTo: id } })}
+      onToast={(msg, kind) => pushToast(msg, kind ?? "success")}
+      wishlist={wishlist}
+      onToggleWishlist={toggleWishlist}
+    />
+  );
+}
+
+/* ═══════════ صفحه‌ی محصول ═══════════ */
+function ProductPage() {
+  const { id } = useParams<{ id: string }>();
+  const { products, productsLoading, addToCart, wishlist, toggleWishlist } = useShop();
+  const navigate = useNavigate();
+
+  if (productsLoading) return <PageLoader />;
+
+  const product = products.find((p) => p.id === id);
+  if (!product) return <NotFound />;
+
+  return (
+    <ProductDetail
+      key={product.id}
+      product={product}
+      related={products.filter((p) => p.id !== product.id)}
+      wished={wishlist.includes(product.id)}
+      onToggleWishlist={toggleWishlist}
+      onBack={() => navigate("/", { state: { scrollTo: "shop" } })}
+      onAdd={(p, qty) => addToCart(p, qty)}
+      onOpenProduct={(pid) => navigate(`/product/${pid}`)}
+    />
+  );
+}
+
+/* ═══════════ پوسته‌ی اصلی ═══════════ */
+function Shell() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  /* اسکرول به بالای صفحه هنگام تغییر مسیر */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-dvh font-sans text-roast-900 selection:bg-gold-500/40">
-      <Header
-        cartCount={cartCount}
-        query={query}
-        onQueryChange={changeQuery}
-        onCartOpen={() => setCartOpen(true)}
-        onOrdersOpen={() => setOrdersOpen(true)}
-        onHome={goHome}
-        onNav={scrollToSection}
-      />
-
-      <OrderHistory
-        open={ordersOpen}
-        onClose={() => setOrdersOpen(false)}
-        onGoShop={() => {
-          setOrdersOpen(false);
-          scrollToSection("shop");
-        }}
-      />
+      <Header />
 
       <main>
-        {view.type === "home" && (
-          <Home
-            products={filtered}
-            query={query}
-            onQueryChange={changeQuery}
-            category={category}
-            onCategoryChange={selectCategory}
-            sort={sort}
-            onSortChange={setSort}
-            onOpenProduct={openProduct}
-            onAddToCart={(p) => addToCart(p)}
-            onNav={scrollToSection}
-            onToast={(msg, kind) => pushToast(msg, kind ?? "success")}
-          />
-        )}
-
-        {view.type === "product" && currentProduct && (
-          <ProductDetail
-            key={currentProduct.id}
-            product={currentProduct}
-            onOpenProduct={openProduct}
-            onBack={() => scrollToSection("shop")}
-            onAdd={(p, q) => addToCart(p, q, true)}
-          />
-        )}
-
-        {view.type === "checkout" && (
-          <Checkout
-            items={cartItems}
-            subtotal={subtotal}
-            onBack={() => scrollToSection("shop")}
-            onGoHome={goHome}
-            onComplete={() => setCart([])}
-          />
-        )}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/product/:id" element={<ProductPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </main>
 
       <Footer
-        onHome={goHome}
-        onNav={scrollToSection}
-        onCategory={(id) => {
-          selectCategory(id as CategoryId);
-          scrollToSection("shop");
-        }}
+        onHome={() => navigate("/")}
+        onNav={(id) => navigate("/", { state: { scrollTo: id } })}
+        onCategory={(id) => navigate("/", { state: { scrollTo: "shop", category: id } })}
       />
 
-      <CartDrawer
-        open={cartOpen}
-        items={cartItems}
-        count={cartCount}
-        subtotal={subtotal}
-        onClose={() => setCartOpen(false)}
-        onSetQty={setLineQty}
-        onRemove={removeLine}
-        onClear={clearCart}
-        onCheckout={goCheckout}
-        onGoShop={() => {
-          setCartOpen(false);
-          scrollToSection("shop");
-        }}
-      />
-
-      {/* اعلان‌ها */}
-      <div className="pointer-events-none fixed bottom-5 left-5 z-[70] flex w-[calc(100vw-2.5rem)] max-w-sm flex-col gap-2.5">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            role="status"
-            className={`animate-toast pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3.5 text-sm font-semibold shadow-lift ${
-              t.kind === "error"
-                ? "border-brick-500/40 bg-brick-600 text-cream-50"
-                : "border-gold-500/30 bg-roast-900 text-cream-100"
-            }`}
-          >
-            <span
-              className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
-                t.kind === "error"
-                  ? "bg-cream-50/20"
-                  : t.kind === "info"
-                    ? "bg-gold-500/20 text-gold-400"
-                    : "bg-olive-600 text-cream-50"
-              }`}
-            >
-              {t.kind === "error" ? (
-                <CloseIcon className="h-4 w-4" />
-              ) : t.kind === "info" ? (
-                <BeanIcon className="h-4 w-4" />
-              ) : (
-                <CheckIcon className="h-4 w-4" />
-              )}
-            </span>
-            <p className="leading-6">{t.message}</p>
-          </div>
-        ))}
-      </div>
+      <ChatWidget />
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <HashRouter>
+      <ShopProvider>
+        <Shell />
+      </ShopProvider>
+    </HashRouter>
+  );
+}
+
+/* استفاده از هوک‌ها را برای سازگاری تایپ‌ها نگه می‌داریم */
+export { usePersistentCart };

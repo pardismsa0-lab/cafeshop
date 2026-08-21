@@ -19,6 +19,8 @@ export interface Product {
   description: string;
   longDescription: string;
   price: number;
+  /** موجودی انبار — توسط لایه‌ی api پر می‌شود */
+  stock?: number;
   image: string;
   rating: number;
   reviews: number;

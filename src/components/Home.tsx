@@ -17,6 +17,7 @@ import {
   CartIcon,
   ChevronDownIcon,
   FlameIcon,
+  HeartIcon,
   LeafIcon,
   PackageIcon,
   ScaleIcon,
@@ -25,9 +26,12 @@ import {
   SteamIcon,
 } from "./icons";
 import Faq from "./Faq";
+import { stockOf } from "../lib/api";
+import { usePageMeta } from "../lib/seo";
 
 interface Props {
   products: Product[];
+  loading: boolean;
   query: string;
   onQueryChange: (q: string) => void;
   category: CategoryId | "all";
@@ -38,6 +42,8 @@ interface Props {
   onAddToCart: (p: Product) => void;
   onNav: (id: string) => void;
   onToast: (msg: string, kind?: "success" | "error") => void;
+  wishlist: string[];
+  onToggleWishlist: (p: Product) => void;
 }
 
 const MARQUEE_ITEMS = [
@@ -90,11 +96,17 @@ function ProductCard({
   product,
   onOpen,
   onAdd,
+  wished,
+  onToggleWish,
 }: {
   product: Product;
   onOpen: (id: string) => void;
   onAdd: (p: Product) => void;
+  wished: boolean;
+  onToggleWish: (p: Product) => void;
 }) {
+  const stock = stockOf(product);
+  const soldOut = stock === 0;
   return (
     <article className="reveal group flex flex-col overflow-hidden rounded-xl border border-roast-900/8 bg-cream-50 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift">
       <div
@@ -105,9 +117,38 @@ function ProductCard({
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.07]"
+          className={`h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.07] ${
+            soldOut ? "opacity-55 grayscale-[0.4]" : ""
+          }`}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-roast-950/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+        {/* علاقه‌مندی */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWish(product);
+          }}
+          aria-label={wished ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
+          aria-pressed={wished}
+          className="absolute top-3 end-3 grid h-10 w-10 place-items-center rounded-full bg-cream-50/90 shadow-card backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-90"
+        >
+          <HeartIcon
+            className={`h-5 w-5 transition-all duration-300 ${wished ? "animate-pop fill-brick-500 stroke-brick-500" : "text-roast-700"}`}
+          />
+        </button>
+
+        {/* موجودی */}
+        {soldOut ? (
+          <span className="absolute bottom-3 start-3 rounded-full bg-roast-950/85 px-3 py-1.5 text-[11px] font-bold text-cream-100 backdrop-blur-sm">
+            اتمام موجودی
+          </span>
+        ) : stock <= 5 ? (
+          <span className="absolute bottom-3 start-3 rounded-full bg-brick-600/90 px-3 py-1.5 text-[11px] font-bold text-cream-50 shadow-card backdrop-blur-sm">
+            فقط {faDigits(stock)} عدد مانده!
+          </span>
+        ) : null}
+
         {product.badge && (
           <span
             className={`absolute top-3 start-3 rounded-full px-3 py-1 text-[11px] font-bold shadow-card ${
@@ -119,16 +160,18 @@ function ProductCard({
             {product.badge === "bestseller" ? "پرفروش" : "جدید"}
           </span>
         )}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAdd(product);
-          }}
-          aria-label={`افزودن ${product.shortName} به سبد خرید`}
-          className="absolute bottom-3 end-3 grid h-11 w-11 place-items-center rounded-full bg-roast-900/90 text-cream-50 shadow-lift backdrop-blur-sm transition-all duration-300 hover:bg-gold-600 hover:text-roast-950 active:scale-90 max-md:opacity-100 md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100"
-        >
-          <CartIcon className="h-5 w-5" />
-        </button>
+        {!soldOut && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd(product);
+            }}
+            aria-label={`افزودن ${product.shortName} به سبد خرید`}
+            className="absolute bottom-3 end-3 grid h-11 w-11 place-items-center rounded-full bg-roast-900/90 text-cream-50 shadow-lift backdrop-blur-sm transition-all duration-300 hover:bg-gold-600 hover:text-roast-950 active:scale-90 max-md:opacity-100 md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100"
+          >
+            <CartIcon className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col p-5">
@@ -177,6 +220,7 @@ function ProductCard({
 export default function Home(props: Props) {
   const {
     products,
+    loading,
     query,
     onQueryChange,
     category,
@@ -187,7 +231,14 @@ export default function Home(props: Props) {
     onAddToCart,
     onNav,
     onToast,
+    wishlist,
+    onToggleWishlist,
   } = props;
+
+  usePageMeta(
+    "آتش‌ودانه | فروشگاه قهوه‌ی تخصصی تازه‌برشت",
+    "خرید آنلاین قهوه‌های سینگل‌اورجین، اسپرسو، کلدبرو و کپسول؛ برشت تازه‌ی هفتگی با ارسال به سراسر کشور.",
+  );
 
   const ref = useReveal<HTMLDivElement>([props.products, props.category, props.sort]);
   const [email, setEmail] = useState("");
@@ -397,10 +448,34 @@ export default function Home(props: Props) {
         </p>
 
         {/* شبکه‌ی محصولات */}
-        {products.length > 0 ? (
+        {loading ? (
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="در حال بارگذاری محصولات">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="overflow-hidden rounded-xl border border-roast-900/8 bg-cream-50 shadow-card">
+                <div className="aspect-[4/3] animate-pulse bg-roast-900/10" />
+                <div className="space-y-3 p-5">
+                  <div className="h-3 w-16 animate-pulse rounded-full bg-roast-900/10" />
+                  <div className="h-5 w-4/5 animate-pulse rounded-full bg-roast-900/10" />
+                  <div className="h-3 w-full animate-pulse rounded-full bg-roast-900/8" />
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="h-6 w-24 animate-pulse rounded-full bg-gold-500/25" />
+                    <div className="h-9 w-28 animate-pulse rounded-full bg-roast-900/10" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : products.length > 0 ? (
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((p) => (
-              <ProductCard key={p.id} product={p} onOpen={onOpenProduct} onAdd={onAddToCart} />
+              <ProductCard
+                key={p.id}
+                product={p}
+                onOpen={onOpenProduct}
+                onAdd={onAddToCart}
+                wished={wishlist.includes(p.id)}
+                onToggleWish={onToggleWishlist}
+              />
             ))}
           </div>
         ) : (

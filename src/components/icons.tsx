@@ -217,3 +217,66 @@ export const TelegramIcon = (p: P) => (
     <path d="m7.6 14 10-8.4-7.7 9.4" />
   </svg>
 );
+
+export const HeartIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 20.3S3.6 15.4 3.6 9.6a4.6 4.6 0 0 1 8.4-2.6A4.6 4.6 0 0 1 20.4 9.6c0 5.8-8.4 10.7-8.4 10.7z" />
+  </svg>
+);
+
+export const UserIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="8" r="3.8" />
+    <path d="M4.8 20.2a7.6 7.6 0 0 1 14.4 0" />
+  </svg>
+);
+
+export const SmsIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M4 5.5h16A1.5 1.5 0 0 1 21.5 7v8.5A1.5 1.5 0 0 1 20 17H9l-4.2 3.4A.6.6 0 0 1 4 19.9V17a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 4 5.5z" />
+    <path d="M8 10h8M8 13h5" />
+  </svg>
+);
+
+export const LogoutIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M14 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
+    <path d="M17 8.5 20.5 12 17 15.5M20 12h-9" />
+  </svg>
+);
+
+export const SendIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M20.5 3.5 3.6 9.8a.7.7 0 0 0 0 1.3l6.2 2.2 2.2 6.2a.7.7 0 0 0 1.3 0l6.3-16.9z" />
+    <path d="m10 13.5 4.5-4.5" />
+  </svg>
+);
+
+export const ChartIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M4 4v15.5a.5.5 0 0 0 .5.5H20" />
+    <path d="M8 16v-5M12.5 16V7.5M17 16v-3.2" />
+  </svg>
+);
+
+export const SettingsIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2.8 13.2 5a7.3 7.3 0 0 1 2.4 1l2.5-.7 1.2 2.1-1.8 1.8c.2.8.2 1.6 0 2.4l1.8 1.8-1.2 2.1-2.5-.7a7.3 7.3 0 0 1-2.4 1L12 21.2 10.8 19a7.3 7.3 0 0 1-2.4-1l-2.5.7-1.2-2.1 1.8-1.8a7.3 7.3 0 0 1 0-2.4L4.7 10.6l1.2-2.1 2.5.7a7.3 7.3 0 0 1 2.4-1z" />
+  </svg>
+);
+
+export const RefreshIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+    <path d="M20 3.5V8h-4.5" />
+  </svg>
+);
+
+export const LockIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="5" y="10.5" width="14" height="9.5" rx="2" />
+    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    <circle cx="12" cy="15.2" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);

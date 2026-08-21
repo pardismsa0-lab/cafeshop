@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { CATEGORY_LABELS, PRODUCTS, type Product } from "../data/products";
+import { stockOf } from "../lib/api";
+import { useJsonLd, usePageMeta } from "../lib/seo";
 import { faDigits, formatNumber, formatToman } from "../lib/utils";
+import { HeartIcon } from "./icons";
 import {
   BackIcon,
   CartIcon,
@@ -20,6 +23,9 @@ import {
 
 interface Props {
   product: Product;
+  related?: Product[];
+  wished?: boolean;
+  onToggleWishlist?: (product: Product) => void;
   onBack: () => void;
   onAdd: (product: Product, qty: number) => void;
   onOpenProduct: (id: string) => void;
@@ -40,9 +46,41 @@ function Stars({ rating, size = "h-4 w-4" }: { rating: number; size?: string }) 
   );
 }
 
-export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }: Props) {
+export default function ProductDetail({
+  product,
+  related: relatedProp,
+  wished = false,
+  onToggleWishlist,
+  onBack,
+  onAdd,
+  onOpenProduct,
+}: Props) {
   const [qty, setQty] = useState(1);
   const [voted, setVoted] = useState<Record<string, boolean>>({});
+  const stock = stockOf(product);
+  const soldOut = stock === 0;
+  const maxQty = Math.max(1, Math.min(MAX_QTY, stock));
+
+  usePageMeta(
+    `${product.name} | آتش‌ودانه`,
+    `${product.description} — قیمت: ${formatNumber(product.price)} تومان`,
+  );
+
+  useJsonLd(`jsonld-${product.id}`, {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    image: product.image,
+    description: product.longDescription,
+    brand: { "@type": "Brand", name: "آتش‌ودانه" },
+    aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating, reviewCount: product.reviews },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "IRR",
+      price: product.price * 10,
+      availability: soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+    },
+  });
 
   const spec = [
     { icon: FlameIcon, label: "تاریخ برشت", value: product.details.roastDate },
@@ -52,7 +90,7 @@ export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }:
   ];
 
   const related = useMemo(() => {
-    const others = PRODUCTS.filter((p) => p.id !== product.id);
+    const others = relatedProp ?? PRODUCTS.filter((p) => p.id !== product.id);
     const sameCategory = others.filter((p) => p.category === product.category);
     const rest = others.filter((p) => p.category !== product.category);
     return [...sameCategory, ...rest.sort((a, b) => b.popularity - a.popularity)].slice(0, 3);
@@ -115,6 +153,17 @@ export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }:
             <span className="rounded-full bg-gold-500/20 px-3.5 py-1.5 text-[11px] font-bold text-gold-700">
               {CATEGORY_LABELS[product.category]}
             </span>
+            {onToggleWishlist && (
+              <button
+                onClick={() => onToggleWishlist(product)}
+                aria-pressed={wished}
+                aria-label={wished ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
+                className="flex items-center gap-1.5 rounded-full border border-roast-900/12 bg-cream-50 px-3.5 py-1.5 text-[11px] font-bold text-roast-700 shadow-card transition-all duration-300 hover:border-brick-500/50 hover:text-brick-600 active:scale-95"
+              >
+                <HeartIcon className={`h-4 w-4 transition-all ${wished ? "animate-pop fill-brick-500 stroke-brick-500" : ""}`} />
+                {wished ? "در علاقه‌مندی‌ها" : "علاقه‌مندی"}
+              </button>
+            )}
             <span className="flex items-center gap-1.5 text-sm font-bold text-roast-700">
               <Stars rating={product.rating} />
               {faDigits(product.rating.toFixed(1))}
@@ -136,9 +185,15 @@ export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }:
           <p className="mt-6 text-[24px] font-extrabold leading-none text-gold-700">
             {formatNumber(product.price)}
             <span className="text-sm font-bold text-gold-700/75"> تومان</span>
-            <span className="ms-3 align-middle text-[11px] font-semibold text-olive-600">
-              ● موجود در انبار برشت‌خانه
-            </span>
+            {soldOut ? (
+              <span className="ms-3 align-middle text-[11px] font-bold text-brick-600">
+                ● ناموجود — به‌زودی برشت می‌شود
+              </span>
+            ) : (
+              <span className={`ms-3 align-middle text-[11px] font-semibold ${stock <= 5 ? "text-brick-600" : "text-olive-600"}`}>
+                ● {stock <= 5 ? `فقط ${faDigits(stock)} عدد در انبار مانده` : "موجود در انبار برشت‌خانه"}
+              </span>
+            )}
           </p>
 
           {/* مشخصات */}
@@ -207,8 +262,8 @@ export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }:
                 {faDigits(qty)}
               </span>
               <button
-                onClick={() => setQty((q) => Math.min(MAX_QTY, q + 1))}
-                disabled={qty >= MAX_QTY}
+                onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+                disabled={qty >= maxQty}
                 aria-label="افزایش تعداد"
                 className="grid h-12 w-12 place-items-center rounded-full text-roast-800 transition-all hover:text-olive-600 active:scale-90 disabled:opacity-25 disabled:hover:text-roast-800"
               >
@@ -218,15 +273,16 @@ export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }:
 
             <button
               onClick={() => onAdd(product, qty)}
-              className="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-gold-600 px-6 py-3.5 text-sm font-bold text-roast-950 shadow-[0_12px_28px_-10px_rgb(168_124_78/0.8)] transition-all duration-300 hover:bg-gold-500 active:scale-[0.97] min-w-52"
+              disabled={soldOut}
+              className="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-gold-600 px-6 py-3.5 text-sm font-bold text-roast-950 shadow-[0_12px_28px_-10px_rgb(168_124_78/0.8)] transition-all duration-300 hover:bg-gold-500 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-roast-900/20 disabled:text-roast-900/50 disabled:shadow-none min-w-52"
             >
               <CartIcon className="h-5 w-5" />
-              افزودن به سبد — {formatToman(product.price * qty)}
+              {soldOut ? "اتمام موجودی" : `افزودن به سبد — ${formatToman(product.price * qty)}`}
             </button>
           </div>
-          {qty >= MAX_QTY && (
+          {qty >= maxQty && !soldOut && (
             <p className="mt-2.5 text-xs font-semibold text-brick-600">
-              حداکثر {faDigits(10)} عدد از هر محصول قابل سفارش است.
+              حداکثر {faDigits(maxQty)} عدد از این لات قابل سفارش است.
             </p>
           )}
 

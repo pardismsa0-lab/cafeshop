@@ -1,16 +1,18 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { BRAND } from "../data/products";
-import { CartIcon, CloseIcon, CupIcon, MenuIcon, PackageIcon, SearchIcon, TruckIcon } from "./icons";
-
-interface Props {
-  cartCount: number;
-  query: string;
-  onQueryChange: (q: string) => void;
-  onCartOpen: () => void;
-  onOrdersOpen: () => void;
-  onHome: () => void;
-  onNav: (sectionId: string) => void;
-}
+import { useShop } from "../lib/shop-context";
+import { faDigits } from "../lib/utils";
+import {
+  CartIcon,
+  CloseIcon,
+  CupIcon,
+  MenuIcon,
+  PackageIcon,
+  SearchIcon,
+  TruckIcon,
+  UserIcon,
+} from "./icons";
 
 const NAV = [
   { label: "خانه", id: "top" },
@@ -19,8 +21,15 @@ const NAV = [
   { label: "درباره‌ی ما", id: "about" },
 ];
 
-export default function Header({ cartCount, query, onQueryChange, onCartOpen, onOrdersOpen, onHome, onNav }: Props) {
+export default function Header() {
+  const navigate = useNavigate();
+  const { cartCount, query, setQuery, setCartOpen, setOrdersOpen, setAuthOpen, user } = useShop();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const goSection = (id: string) => {
+    setMenuOpen(false);
+    navigate("/", { state: { scrollTo: id } });
+  };
 
   const searchBox = (extra?: string) => (
     <div className={`relative ${extra ?? ""}`}>
@@ -28,7 +37,7 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
       <input
         type="search"
         value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
+        onChange={(e) => setQuery(e.target.value)}
         placeholder="جستجوی قهوه، خاستگاه، نت‌های طعمی…"
         aria-label="جستجوی محصولات"
         className="w-full rounded-full border border-gold-500/25 bg-roast-800/80 py-2.5 pe-4 ps-10 text-sm text-cream-100 placeholder:text-cream-100/40 transition-all duration-300 focus:border-gold-500/70 focus:bg-roast-800 focus:shadow-[0_0_0_4px_rgb(196_154_108/0.15)] focus:outline-none [&::-webkit-search-cancel-button]:hidden"
@@ -48,7 +57,7 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
 
       {/* نوار اصلی */}
       <div className="border-b border-gold-500/15 bg-roast-900/95 shadow-[0_10px_30px_-18px_rgb(30_15_9/0.9)] backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 md:gap-6">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 md:gap-5">
           {/* منوی موبایل */}
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -59,7 +68,7 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
           </button>
 
           {/* لوگو */}
-          <button onClick={onHome} className="group flex items-center gap-2.5" aria-label="صفحه‌ی اصلی">
+          <button onClick={() => navigate("/")} className="group flex items-center gap-2.5" aria-label="صفحه‌ی اصلی">
             <span className="relative grid h-10 w-10 place-items-center rounded-xl bg-gold-500 text-roast-950 shadow-[0_6px_18px_-6px_rgb(196_154_108/0.8)] transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105">
               <CupIcon className="h-5.5 w-5.5" strokeWidth={1.6} />
             </span>
@@ -78,7 +87,7 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
             {NAV.map((item) => (
               <button
                 key={item.id}
-                onClick={() => onNav(item.id)}
+                onClick={() => goSection(item.id)}
                 className="relative rounded-full px-3.5 py-2 text-sm font-medium text-cream-100/85 transition-all duration-300 after:absolute after:bottom-1 after:start-1/2 after:h-0.5 after:w-0 after:translate-x-1/2 after:rounded-full after:bg-gold-400 after:transition-all after:duration-300 hover:text-gold-300 hover:after:w-5"
               >
                 {item.label}
@@ -89,21 +98,33 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
           {/* جستجوی دسکتاپ */}
           <div className="ms-auto hidden w-full max-w-xs lg:block">{searchBox()}</div>
 
+          {/* حساب کاربری */}
+          <button
+            onClick={() => (user ? navigate("/account") : setAuthOpen(true))}
+            aria-label="حساب کاربری"
+            className="group relative ms-auto flex items-center gap-2 rounded-full border border-gold-500/30 bg-roast-800 px-3.5 py-2.5 text-cream-100 transition-all duration-300 hover:border-gold-500/70 hover:bg-gold-600 hover:text-roast-950 md:ms-0"
+          >
+            <UserIcon className="h-5 w-5 transition-transform duration-300 group-hover:-translate-y-0.5" />
+            <span className="hidden max-w-24 truncate text-sm font-semibold sm:block">
+              {user ? (user.name.trim() || faDigits(user.phone).slice(0, 6) + "…") : "ورود"}
+            </span>
+          </button>
+
           {/* سفارش‌های من */}
           <button
-            onClick={onOrdersOpen}
+            onClick={() => setOrdersOpen(true)}
             aria-label="سفارش‌های من"
             className="group hidden items-center gap-2 rounded-full border border-gold-500/30 bg-roast-800 px-3.5 py-2.5 text-cream-100 transition-all duration-300 hover:border-gold-500/70 hover:bg-gold-600 hover:text-roast-950 md:flex"
           >
             <PackageIcon className="h-5 w-5 transition-transform duration-300 group-hover:-rotate-6" />
-            <span className="hidden text-sm font-semibold lg:block">سفارش‌های من</span>
+            <span className="hidden text-sm font-semibold xl:block">سفارش‌ها</span>
           </button>
 
           {/* سبد خرید */}
           <button
-            onClick={onCartOpen}
+            onClick={() => setCartOpen(true)}
             aria-label="باز کردن سبد خرید"
-            className="group relative ms-auto flex items-center gap-2 rounded-full border border-gold-500/30 bg-roast-800 px-3.5 py-2.5 text-cream-100 transition-all duration-300 hover:border-gold-500/70 hover:bg-gold-600 hover:text-roast-950 md:ms-0"
+            className="group relative flex items-center gap-2 rounded-full border border-gold-500/30 bg-roast-800 px-3.5 py-2.5 text-cream-100 transition-all duration-300 hover:border-gold-500/70 hover:bg-gold-600 hover:text-roast-950"
           >
             <CartIcon className="h-5 w-5 transition-transform duration-300 group-hover:-translate-y-0.5" />
             <span className="hidden text-sm font-semibold sm:block">سبد خرید</span>
@@ -112,7 +133,7 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
                 key={cartCount}
                 className="animate-pop absolute -top-1.5 -start-1.5 grid h-5.5 min-w-5.5 place-items-center rounded-full bg-gold-500 px-1 text-[11px] font-bold text-roast-950 ring-2 ring-roast-900"
               >
-                {cartCount}
+                {faDigits(cartCount)}
               </span>
             )}
           </button>
@@ -132,26 +153,33 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
               {NAV.map((item) => (
                 <li key={item.id}>
                   <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onNav(item.id);
-                    }}
+                    onClick={() => goSection(item.id)}
                     className="w-full rounded-lg px-3 py-2.5 text-start text-sm font-medium text-cream-100/90 transition-colors hover:bg-roast-800 hover:text-gold-300"
                   >
                     {item.label}
                   </button>
                 </li>
               ))}
-              <li className="pt-1.5">
+              <li className="flex gap-2 pt-1.5">
                 <button
                   onClick={() => {
                     setMenuOpen(false);
-                    onOrdersOpen();
+                    setOrdersOpen(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-start text-sm font-bold text-gold-300 transition-colors hover:bg-roast-800"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-roast-800 px-3 py-2.5 text-sm font-bold text-gold-300 transition-colors hover:bg-roast-700"
                 >
                   <PackageIcon className="h-4.5 w-4.5" />
                   سفارش‌های من
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate("/admin");
+                  }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gold-500/25 px-3 py-2.5 text-sm font-bold text-cream-200/80 transition-colors hover:text-gold-300"
+                >
+                  <SearchIcon className="hidden" />
+                  پنل مدیریت
                 </button>
               </li>
             </ul>
