@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { BRAND } from "../data/products";
-import { CartIcon, CloseIcon, CupIcon, MenuIcon, SearchIcon, TruckIcon } from "./icons";
+import { CartIcon, CloseIcon, CupIcon, MenuIcon, PackageIcon, SearchIcon, TruckIcon } from "./icons";
 
 interface Props {
   cartCount: number;
   query: string;
   onQueryChange: (q: string) => void;
   onCartOpen: () => void;
+  onOrdersOpen: () => void;
   onHome: () => void;
   onNav: (sectionId: string) => void;
 }
@@ -18,7 +19,7 @@ const NAV = [
   { label: "درباره‌ی ما", id: "about" },
 ];
 
-export default function Header({ cartCount, query, onQueryChange, onCartOpen, onHome, onNav }: Props) {
+export default function Header({ cartCount, query, onQueryChange, onCartOpen, onOrdersOpen, onHome, onNav }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const searchBox = (extra?: string) => (
@@ -88,6 +89,16 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
           {/* جستجوی دسکتاپ */}
           <div className="ms-auto hidden w-full max-w-xs lg:block">{searchBox()}</div>
 
+          {/* سفارش‌های من */}
+          <button
+            onClick={onOrdersOpen}
+            aria-label="سفارش‌های من"
+            className="group hidden items-center gap-2 rounded-full border border-gold-500/30 bg-roast-800 px-3.5 py-2.5 text-cream-100 transition-all duration-300 hover:border-gold-500/70 hover:bg-gold-600 hover:text-roast-950 md:flex"
+          >
+            <PackageIcon className="h-5 w-5 transition-transform duration-300 group-hover:-rotate-6" />
+            <span className="hidden text-sm font-semibold lg:block">سفارش‌های من</span>
+          </button>
+
           {/* سبد خرید */}
           <button
             onClick={onCartOpen}
@@ -131,6 +142,18 @@ export default function Header({ cartCount, query, onQueryChange, onCartOpen, on
                   </button>
                 </li>
               ))}
+              <li className="pt-1.5">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOrdersOpen();
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-start text-sm font-bold text-gold-300 transition-colors hover:bg-roast-800"
+                >
+                  <PackageIcon className="h-4.5 w-4.5" />
+                  سفارش‌های من
+                </button>
+              </li>
             </ul>
           </nav>
         </div>

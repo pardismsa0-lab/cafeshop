@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import CartDrawer, { type CartItem } from "./components/CartDrawer";
+import OrderHistory from "./components/OrderHistory";
 import Checkout from "./components/Checkout";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
@@ -24,6 +25,7 @@ export default function App() {
   const [view, setView] = useState<View>({ type: "home" });
   const [cart, setCart] = usePersistentCart();
   const [cartOpen, setCartOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryId | "all">("all");
   const [sort, setSort] = useState<SortKey>("popular");
@@ -173,8 +175,18 @@ export default function App() {
         query={query}
         onQueryChange={changeQuery}
         onCartOpen={() => setCartOpen(true)}
+        onOrdersOpen={() => setOrdersOpen(true)}
         onHome={goHome}
         onNav={scrollToSection}
+      />
+
+      <OrderHistory
+        open={ordersOpen}
+        onClose={() => setOrdersOpen(false)}
+        onGoShop={() => {
+          setOrdersOpen(false);
+          scrollToSection("shop");
+        }}
       />
 
       <main>
@@ -198,6 +210,7 @@ export default function App() {
           <ProductDetail
             key={currentProduct.id}
             product={currentProduct}
+            onOpenProduct={openProduct}
             onBack={() => scrollToSection("shop")}
             onAdd={(p, q) => addToCart(p, q, true)}
           />

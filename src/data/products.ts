@@ -1,6 +1,16 @@
 export type CategoryId = "whole" | "ground" | "capsule";
 export type SortKey = "popular" | "cheap" | "expensive" | "newest";
 
+export interface Review {
+  id: string;
+  author: string;
+  date: string;
+  rating: number;
+  text: string;
+  helpful: number;
+  verified: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -24,6 +34,7 @@ export interface Product {
     altitude: string;
     tastingNotes: string[];
   };
+  customerReviews: Review[];
 }
 
 export const CATEGORY_LABELS: Record<CategoryId, string> = {
@@ -46,6 +57,15 @@ export const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: "newest", label: "جدیدترین" },
 ];
 
+/** آستانه‌ی ارسال رایگان */
+export const FREE_SHIPPING_THRESHOLD = 500_000;
+
+/** کدهای تخفیف (شبیه‌سازی) */
+export const COUPONS: Record<string, number> = {
+  ATASH10: 10,
+  BAHAAR15: 15,
+};
+
 const IMG = {
   ethiopia:
     "https://image.qwenlm.ai/generated-images/63dd1758-95ff-4b28-a49a-7ec2b2fdb7ea/_result.png",
@@ -63,6 +83,9 @@ const IMG = {
 
 export const HERO_IMAGE =
   "https://image.qwenlm.ai/generated-images/ecab241b-13b6-4dc6-a4b9-312870206648/_result.png";
+
+export const ROASTERY_IMAGE =
+  "https://image.qwenlm.ai/generated-images/46e84b13-f5f7-4bc3-9b44-1e3696d7da50/_result.png";
 
 export const PRODUCTS: Product[] = [
   {
@@ -89,6 +112,35 @@ export const PRODUCTS: Product[] = [
       altitude: "۱۹۰۰ تا ۲۲۰۰ متر",
       tastingNotes: ["یاسمین", "ترنج", "لیمو شیرین"],
     },
+    customerReviews: [
+      {
+        id: "eth-1",
+        author: "نیلوفر احمدی",
+        date: "۱۲ مهر ۱۴۰۴",
+        rating: 5,
+        text: "عطر یاسمینش از همان لحظه‌ی آسیاب‌کردن بلند می‌شود؛ با V60 فوق‌العاده شفاف و تمیز درمی‌آید. بهترین یرگاچفی بود که تا حالا نوشیده‌ام.",
+        helpful: 23,
+        verified: true,
+      },
+      {
+        id: "eth-2",
+        author: "کاوه میرزایی",
+        date: "۸ مهر ۱۴۰۴",
+        rating: 4,
+        text: "اسیدیته‌ی مرکباتی‌اش برای ذائقه‌ی من کمی روشن بود، ولی کیفیت دانه واقعاً بالاست. برای دم سرد هم نتیجه‌ی جالبی داد.",
+        helpful: 11,
+        verified: true,
+      },
+      {
+        id: "eth-3",
+        author: "غزل رضوی",
+        date: "۳ مهر ۱۴۰۴",
+        rating: 5,
+        text: "بسته‌بندی با تاریخ برشتِ همان هفته رسید. نت لیمو شیرینش کنار دسرهای شکلاتی معرکه است.",
+        helpful: 8,
+        verified: false,
+      },
+    ],
   },
   {
     id: "colombia-supremo",
@@ -113,6 +165,26 @@ export const PRODUCTS: Product[] = [
       altitude: "۱۵۰۰ تا ۱۸۰۰ متر",
       tastingNotes: ["شکلات شیری", "فندق", "کارامل"],
     },
+    customerReviews: [
+      {
+        id: "col-1",
+        author: "بهرام شریفی",
+        date: "۱۵ مهر ۱۴۰۴",
+        rating: 5,
+        text: "تعادلش بی‌نظیر است؛ نه زیادی ترش، نه تلخ. با فرنچ‌پرس، صبح‌هایم را می‌سازد.",
+        helpful: 17,
+        verified: true,
+      },
+      {
+        id: "col-2",
+        author: "مهشید کریمی",
+        date: "۲ مهر ۱۴۰۴",
+        rating: 4,
+        text: "نت فندق و کاراملش کاملاً مشخص است. فقط کاش بسته‌ی نیم‌کیلویی هم داشتید!",
+        helpful: 9,
+        verified: true,
+      },
+    ],
   },
   {
     id: "baron-espresso",
@@ -138,6 +210,35 @@ export const PRODUCTS: Product[] = [
       altitude: "۹۰۰ تا ۱۲۰۰ متر",
       tastingNotes: ["کاکائو", "ادویه", "شکر قهوه‌ای"],
     },
+    customerReviews: [
+      {
+        id: "bar-1",
+        author: "آرش قاسمی",
+        date: "۲۰ مهر ۱۴۰۴",
+        rating: 5,
+        text: "برای اسپرسوساز خانگی فوق‌العاده است؛ کرمای غلیظ و شکلاتی می‌دهد. از خیلی کافه‌ها بهتر است.",
+        helpful: 31,
+        verified: true,
+      },
+      {
+        id: "bar-2",
+        author: "سپیده نادری",
+        date: "۱۱ مهر ۱۴۰۴",
+        rating: 4,
+        text: "با شیر عالی می‌شود و لاته‌آرتش هم خوب درمی‌آید. تلخی‌اش برای ذائقه‌ی من مناسب است.",
+        helpful: 14,
+        verified: true,
+      },
+      {
+        id: "bar-3",
+        author: "حمید توکلی",
+        date: "۵ مهر ۱۴۰۴",
+        rating: 4,
+        text: "ارسال سریع بود و دانه‌ها تازه. روبوستایش اصلاً زننده نیست؛ شات صبحگاهیِ کاملی می‌دهد.",
+        helpful: 6,
+        verified: false,
+      },
+    ],
   },
   {
     id: "brazil-santos",
@@ -163,11 +264,31 @@ export const PRODUCTS: Product[] = [
       altitude: "۸۰۰ تا ۱۳۵۰ متر",
       tastingNotes: ["فندق", "ملاس", "کشمش"],
     },
+    customerReviews: [
+      {
+        id: "bra-1",
+        author: "لیلا موسوی",
+        date: "۱۸ مهر ۱۴۰۴",
+        rating: 5,
+        text: "۱۴ ساعت کلدبرو کردم؛ شیرین و نرم، بدون هیچ تلخی آزاردهنده. با یخ و کمی شیر محشر می‌شود.",
+        helpful: 19,
+        verified: true,
+      },
+      {
+        id: "bra-2",
+        author: "پویا افشار",
+        date: "۹ مهر ۱۴۰۴",
+        rating: 5,
+        text: "نت ملاس و کشمشش توی دم سرد خیلی واضح است. تابستان‌ها فقط همین را می‌خرم.",
+        helpful: 12,
+        verified: true,
+      },
+    ],
   },
   {
     id: "lungo-capsule",
-    name: "کپسول قهوه‌ی لונگو کامپاتیبل",
-    shortName: "کپسول لونگو",
+    name: "کپسول قهوه‌ی لُونگو کامپاتیبل",
+    shortName: "کپسول لُونگو",
     category: "capsule",
     description: "سازگار با دستگاه‌های نِسپرسو، رست متوسط",
     longDescription:
@@ -187,6 +308,26 @@ export const PRODUCTS: Product[] = [
       altitude: "۱۲۰۰ تا ۱۶۰۰ متر",
       tastingNotes: ["غلات برشته", "عسل", "سیب قرمز"],
     },
+    customerReviews: [
+      {
+        id: "lun-1",
+        author: "نرگس صادقی",
+        date: "۱۶ مهر ۱۴۰۴",
+        rating: 4,
+        text: "با دستگاه نسپرسوی قدیمی‌ام کاملاً سازگار است. عطرش توی دفتر همه را جذب می‌کند!",
+        helpful: 7,
+        verified: true,
+      },
+      {
+        id: "lun-2",
+        author: "فرهاد جلیلی",
+        date: "۲۸ شهریور ۱۴۰۴",
+        rating: 4,
+        text: "نسبت به قیمتش کیفیت خوبی دارد؛ بدنه‌اش شاید کمی سبک باشد ولی برای مصرف روزمره عالیه.",
+        helpful: 5,
+        verified: false,
+      },
+    ],
   },
   {
     id: "swiss-water-decaf",
@@ -212,6 +353,26 @@ export const PRODUCTS: Product[] = [
       altitude: "۱۶۰۰ تا ۲۰۰۰ متر",
       tastingNotes: ["شکلات تلخ", "خرما", "گردو"],
     },
+    customerReviews: [
+      {
+        id: "dec-1",
+        author: "شیرین عبّاسی",
+        date: "۲۱ مهر ۱۴۰۴",
+        rating: 5,
+        text: "باورم نمی‌شد دکف این‌قدر خوش‌طعم باشد؛ هیچ مزه‌ی کاغذی یا شیمیایی ندارد. عصرها با خیال راحت می‌نوشم.",
+        helpful: 15,
+        verified: true,
+      },
+      {
+        id: "dec-2",
+        author: "بابک امینی",
+        date: "۷ مهر ۱۴۰۴",
+        rating: 4,
+        text: "نت خرما و گردویش مشخص است. روش سوئیس‌واتر واقعاً تفاوت را نشان می‌دهد.",
+        helpful: 9,
+        verified: true,
+      },
+    ],
   },
 ];
 

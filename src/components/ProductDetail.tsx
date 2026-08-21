@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { CATEGORY_LABELS, type Product } from "../data/products";
+import { useMemo, useState } from "react";
+import { CATEGORY_LABELS, PRODUCTS, type Product } from "../data/products";
 import { faDigits, formatNumber, formatToman } from "../lib/utils";
 import {
   BackIcon,
   CartIcon,
+  CheckIcon,
   FlameIcon,
   LeafIcon,
   MinusIcon,
@@ -21,12 +22,27 @@ interface Props {
   product: Product;
   onBack: () => void;
   onAdd: (product: Product, qty: number) => void;
+  onOpenProduct: (id: string) => void;
 }
 
 const MAX_QTY = 10;
 
-export default function ProductDetail({ product, onBack, onAdd }: Props) {
+function Stars({ rating, size = "h-4 w-4" }: { rating: number; size?: string }) {
+  return (
+    <span className="flex items-center gap-0.5" aria-label={`امتیاز ${faDigits(rating.toFixed(1))} از ۵`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <StarIcon
+          key={i}
+          className={`${size} ${i <= Math.round(rating) ? "text-gold-500" : "text-roast-900/15"}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+export default function ProductDetail({ product, onBack, onAdd, onOpenProduct }: Props) {
   const [qty, setQty] = useState(1);
+  const [voted, setVoted] = useState<Record<string, boolean>>({});
 
   const spec = [
     { icon: FlameIcon, label: "تاریخ برشت", value: product.details.roastDate },
@@ -34,6 +50,13 @@ export default function ProductDetail({ product, onBack, onAdd }: Props) {
     { icon: LeafIcon, label: "روش فرآوری", value: product.details.process },
     { icon: ScaleIcon, label: "ارتفاع کشت", value: product.details.altitude },
   ];
+
+  const related = useMemo(() => {
+    const others = PRODUCTS.filter((p) => p.id !== product.id);
+    const sameCategory = others.filter((p) => p.category === product.category);
+    const rest = others.filter((p) => p.category !== product.category);
+    return [...sameCategory, ...rest.sort((a, b) => b.popularity - a.popularity)].slice(0, 3);
+  }, [product]);
 
   return (
     <div className="animate-fade-up mx-auto max-w-6xl px-4 py-10">
@@ -93,18 +116,14 @@ export default function ProductDetail({ product, onBack, onAdd }: Props) {
               {CATEGORY_LABELS[product.category]}
             </span>
             <span className="flex items-center gap-1.5 text-sm font-bold text-roast-700">
-              <span className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <StarIcon
-                    key={i}
-                    className={`h-4 w-4 ${i <= Math.round(product.rating) ? "text-gold-500" : "text-roast-900/15"}`}
-                  />
-                ))}
-              </span>
+              <Stars rating={product.rating} />
               {faDigits(product.rating.toFixed(1))}
-              <span className="font-medium text-roast-600">
+              <a
+                href="#reviews"
+                className="font-medium text-roast-600 underline decoration-gold-600/50 underline-offset-4 transition-colors hover:text-gold-700"
+              >
                 ({faDigits(product.reviews)} نظر)
-              </span>
+              </a>
             </span>
           </div>
 
@@ -225,6 +244,153 @@ export default function ProductDetail({ product, onBack, onAdd }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ═══════════ نظرات مشتریان ═══════════ */}
+      <section id="reviews" className="mt-16 scroll-mt-44 grid gap-8 lg:grid-cols-[minmax(0,320px)_1fr]">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-bold text-gold-700">
+            <span className="h-px w-8 bg-gold-600" />
+            دیدگاه خریداران
+          </p>
+          <h2 className="font-display mt-3 text-3xl text-roast-900">نظرات مشتریان</h2>
+
+          <div className="mt-5 rounded-xl border border-roast-900/10 bg-roast-900 p-6 text-cream-100 shadow-lift">
+            <div className="flex items-end gap-3">
+              <span className="font-display text-5xl leading-none text-gold-400">
+                {faDigits(product.rating.toFixed(1))}
+              </span>
+              <div className="pb-1">
+                <Stars rating={product.rating} size="h-4.5 w-4.5" />
+                <p className="mt-1.5 text-[11px] text-cream-200/60">
+                  از مجموع {faDigits(product.reviews)} نظر ثبت‌شده
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 border-t border-gold-500/15 pt-4 text-xs leading-6 text-cream-200/70">
+              همه‌ی نظرات پس از تأیید خرید، بدون دستکاری منتشر می‌شوند.
+            </p>
+          </div>
+        </div>
+
+        <ul className="space-y-4">
+          {product.customerReviews.map((r, idx) => {
+            const hasVoted = voted[r.id];
+            return (
+              <li
+                key={r.id}
+                className="animate-fade-up rounded-xl border border-roast-900/10 bg-cream-50 p-5 shadow-card transition-all duration-300 hover:border-gold-600/40 hover:shadow-lift"
+                style={{ animationDelay: `${idx * 0.1}s` }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className="font-display grid h-11 w-11 place-items-center rounded-full bg-gold-500/25 text-xl text-gold-700">
+                      {r.author.trim()[0]}
+                    </span>
+                    <div>
+                      <p className="text-sm font-extrabold text-roast-900">
+                        {r.author}
+                        {r.verified && (
+                          <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-olive-600/12 px-2 py-0.5 text-[10px] font-bold text-olive-600">
+                            <CheckIcon className="h-3 w-3" strokeWidth={3} />
+                            خرید تأییدشده
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-roast-600">{r.date}</p>
+                    </div>
+                  </div>
+                  <Stars rating={r.rating} size="h-3.5 w-3.5" />
+                </div>
+                <p className="mt-3.5 text-sm leading-8 text-roast-700">{r.text}</p>
+                <button
+                  onClick={() => setVoted((v) => ({ ...v, [r.id]: true }))}
+                  disabled={hasVoted}
+                  className={`mt-3.5 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-300 active:scale-95 ${
+                    hasVoted
+                      ? "bg-olive-600/15 text-olive-600"
+                      : "bg-roast-900/6 text-roast-600 hover:bg-gold-500/20 hover:text-gold-700"
+                  }`}
+                >
+                  {hasVoted ? <CheckIcon className="h-3.5 w-3.5" /> : null}
+                  {hasVoted ? "رأی شما ثبت شد" : "مفید بود"} ({faDigits(r.helpful + (hasVoted ? 1 : 0))})
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* ═══════════ شاید بپسندید ═══════════ */}
+      <section className="mt-16">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-bold text-gold-700">
+              <span className="h-px w-8 bg-gold-600" />
+              پیشنهاد برشت‌خانه
+            </p>
+            <h2 className="font-display mt-3 text-3xl text-roast-900">شاید این‌ها را هم بپسندید</h2>
+          </div>
+          <button
+            onClick={onBack}
+            className="hidden rounded-full border border-roast-900/15 px-5 py-2.5 text-xs font-bold text-roast-700 transition-all hover:border-gold-600 hover:text-gold-700 sm:block"
+          >
+            دیدن همه‌ی محصولات
+          </button>
+        </div>
+
+        <div className="mt-7 grid gap-5 sm:grid-cols-3">
+          {related.map((p) => (
+            <article
+              key={p.id}
+              className="group overflow-hidden rounded-xl border border-roast-900/8 bg-cream-50 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift"
+            >
+              <button
+                onClick={() => onOpenProduct(p.id)}
+                className="block aspect-[4/3] w-full overflow-hidden bg-cream-200"
+                aria-label={`مشاهده‌ی ${p.name}`}
+              >
+                <img
+                  src={p.image}
+                  alt={p.name}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.07]"
+                />
+              </button>
+              <div className="p-4">
+                <h3 className="line-clamp-1 text-sm font-extrabold text-roast-900">
+                  <button
+                    onClick={() => onOpenProduct(p.id)}
+                    className="transition-colors hover:text-gold-700"
+                  >
+                    {p.name}
+                  </button>
+                </h3>
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <p className="text-sm font-extrabold text-gold-700">
+                    {formatNumber(p.price)}
+                    <span className="text-[10px] font-bold text-gold-700/75"> تومان</span>
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => onAdd(p, 1)}
+                      aria-label={`افزودن ${p.shortName} به سبد`}
+                      className="grid h-9 w-9 place-items-center rounded-full bg-roast-800 text-cream-50 transition-all duration-300 hover:bg-gold-600 hover:text-roast-950 active:scale-90"
+                    >
+                      <CartIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onOpenProduct(p.id)}
+                      className="rounded-full border border-roast-900/15 px-3.5 py-2 text-[11px] font-bold text-roast-700 transition-all hover:border-gold-600 hover:text-gold-700 active:scale-95"
+                    >
+                      مشاهده
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

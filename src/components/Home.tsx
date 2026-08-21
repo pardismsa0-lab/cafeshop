@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   CATEGORY_FILTERS,
   HERO_IMAGE,
+  ROASTERY_IMAGE,
   PRODUCTS,
   SORT_OPTIONS,
   type CategoryId,
@@ -23,6 +24,7 @@ import {
   StarIcon,
   SteamIcon,
 } from "./icons";
+import Faq from "./Faq";
 
 interface Props {
   products: Product[];
@@ -517,8 +519,8 @@ export default function Home(props: Props) {
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 py-16 lg:grid-cols-2 lg:py-24">
           <div className="reveal relative order-2 lg:order-1">
             <img
-              src={HERO_IMAGE}
-              alt="فضای برشت‌خانه‌ی آتش‌ودانه"
+              src={ROASTERY_IMAGE}
+              alt="فضای برشت‌خانه‌ی آتش‌ودانه و دستگاه برشت مسی"
               loading="lazy"
               className="aspect-[4/3] w-full rounded-xl object-cover shadow-lift"
             />
@@ -564,6 +566,11 @@ export default function Home(props: Props) {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* پرسش‌های پرتکرار */}
+        <div className="pb-14 lg:pb-20">
+          <Faq />
         </div>
 
         {/* خبرنامه */}

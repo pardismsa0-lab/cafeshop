@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import type { Product } from "../data/products";
+import { FREE_SHIPPING_THRESHOLD, type Product } from "../data/products";
 import { faDigits, formatNumber, formatToman } from "../lib/utils";
-import { CartIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "./icons";
+import { CartIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon, TruckIcon } from "./icons";
 
 export interface CartItem {
   product: Product;
@@ -174,6 +174,36 @@ export default function CartDrawer({
 
             {/* جمع‌بندی */}
             <footer className="space-y-3.5 border-t border-roast-900/10 bg-cream-50 p-5">
+              {/* نوار پیشرفت ارسال رایگان */}
+              {(() => {
+                const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+                const pct = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
+                return (
+                  <div className="rounded-xl border border-roast-900/8 bg-cream-100/70 p-3.5">
+                    <p className="flex items-center gap-2 text-[11px] font-bold">
+                      <TruckIcon className={`h-4.5 w-4.5 shrink-0 ${remaining === 0 ? "text-olive-600" : "text-gold-700"}`} />
+                      {remaining === 0 ? (
+                        <span className="text-olive-600">تبریک! ارسال این سفارش رایگان شد.</span>
+                      ) : (
+                        <span className="text-roast-700">
+                          تا ارسال رایگان، فقط{" "}
+                          <strong className="font-extrabold text-gold-700">{formatNumber(remaining)}</strong> تومان
+                          مانده
+                        </span>
+                      )}
+                    </p>
+                    <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-roast-900/10">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ease-out ${
+                          remaining === 0 ? "bg-olive-600" : "bg-gradient-to-l from-gold-500 to-gold-600"
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex items-center justify-between text-sm text-roast-600">
                 <span>تعداد کل اقلام</span>
                 <strong className="font-extrabold text-roast-900">{faDigits(count)}</strong>

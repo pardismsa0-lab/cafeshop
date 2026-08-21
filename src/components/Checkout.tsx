@@ -1,13 +1,21 @@
 import { useState } from "react";
 import confetti from "canvas-confetti";
-import { PAYMENT_METHODS, SHIPPING_METHODS, type ShippingMethod } from "../data/products";
+import {
+  COUPONS,
+  FREE_SHIPPING_THRESHOLD,
+  PAYMENT_METHODS,
+  SHIPPING_METHODS,
+  type ShippingMethod,
+} from "../data/products";
 import { faDigits, formatToman, isValidPhone, makeTrackingCode, todayFa } from "../lib/utils";
 import type { CartItem } from "./CartDrawer";
+import { saveOrder } from "./OrderHistory";
 import {
   BackIcon,
   CardIcon,
   CashIcon,
   CheckIcon,
+  CloseIcon,
   PackageIcon,
   StoreIcon,
   TruckIcon,
@@ -45,9 +53,32 @@ export default function Checkout({ items, subtotal, onBack, onGoHome, onComplete
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState<OrderReceipt | null>(null);
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; percent: number } | null>(null);
+  const [couponError, setCouponError] = useState("");
 
-  const shippingCost = SHIPPING_METHODS.find((s) => s.id === shipping)?.cost ?? 0;
-  const total = subtotal + shippingCost;
+  const discount = coupon ? Math.round((subtotal * coupon.percent) / 100) : 0;
+  const payable = subtotal - discount;
+  const freeShipping = payable >= FREE_SHIPPING_THRESHOLD;
+  const shippingCost = freeShipping ? 0 : (SHIPPING_METHODS.find((s) => s.id === shipping)?.cost ?? 0);
+  const total = payable + shippingCost;
+
+  const applyCoupon = () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) {
+      setCouponError("کد تخفیف را وارد کنید.");
+      return;
+    }
+    const percent = COUPONS[code];
+    if (percent) {
+      setCoupon({ code, percent });
+      setCouponError("");
+      setCouponInput("");
+    } else {
+      setCoupon(null);
+      setCouponError("کد تخفیف معتبر نیست یا منقضی شده است.");
+    }
+  };
 
   const validate = () => {
     const next: typeof errors = {};
@@ -71,6 +102,15 @@ export default function Checkout({ items, subtotal, onBack, onGoHome, onComplete
         paymentLabel: PAYMENT_METHODS.find((p) => p.id === payment)?.label ?? "",
         total,
       };
+      /* ذخیره در تاریخچه‌ی سفارش‌های کاربر */
+      saveOrder({
+        ...receipt,
+        phone,
+        items: items.map((i) => ({ name: i.product.shortName, qty: i.qty, price: i.product.price })),
+        subtotal,
+        discount,
+        shippingCost,
+      });
       setOrder(receipt);
       setSubmitting(false);
       onComplete();
@@ -362,11 +402,77 @@ export default function Checkout({ items, subtotal, onBack, onGoHome, onComplete
               ))}
             </ul>
 
+            {/* کد تخفیف */}
+            <div className="mt-4 border-t border-roast-900/10 pt-4">
+              {coupon ? (
+                <div className="animate-fade-up flex items-center justify-between gap-3 rounded-xl bg-olive-600/12 px-4 py-3">
+                  <p className="text-xs font-bold text-olive-700">
+                    کد <span dir="ltr">{coupon.code}</span> اعمال شد — {faDigits(coupon.percent)}٪ تخفیف
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCoupon(null)}
+                    aria-label="حذف کد تخفیف"
+                    className="rounded-full p-1 text-olive-700 transition-all hover:bg-olive-600/15 active:scale-90"
+                  >
+                    <CloseIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex gap-2">
+                    <input
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value);
+                        setCouponError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          applyCoupon();
+                        }
+                      }}
+                      placeholder="کد تخفیف (مثلاً ATASH10)"
+                      aria-label="کد تخفیف"
+                      dir="ltr"
+                      className="min-w-0 flex-1 rounded-full border border-roast-900/15 bg-cream-100 px-4 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-roast-900 placeholder:font-sans placeholder:font-medium placeholder:normal-case placeholder:tracking-normal transition-all focus:border-gold-600 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyCoupon}
+                      className="rounded-full bg-roast-900 px-5 py-2.5 text-xs font-bold text-cream-50 transition-all hover:bg-roast-800 active:scale-95"
+                    >
+                      اعمال
+                    </button>
+                  </div>
+                  {couponError ? (
+                    <p className="animate-fade-up mt-2 text-[11px] font-bold text-brick-600">{couponError}</p>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-roast-600">
+                      کد پیشنهادی امروز:{" "}
+                      <strong dir="ltr" className="font-bold text-gold-700">
+                        ATASH10
+                      </strong>
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <dl className="mt-2 space-y-2.5 border-t border-roast-900/10 pt-4 text-sm">
               <div className="flex justify-between text-roast-600">
                 <dt>جمع کالاها</dt>
                 <dd className="font-bold text-roast-900">{formatToman(subtotal)}</dd>
               </div>
+              {discount > 0 && (
+                <div className="animate-fade-up flex justify-between text-olive-700">
+                  <dt>
+                    تخفیف (<span dir="ltr">{coupon?.code}</span>)
+                  </dt>
+                  <dd className="font-extrabold">− {formatToman(discount)}</dd>
+                </div>
+              )}
               <div className="flex justify-between text-roast-600">
                 <dt>هزینه‌ی ارسال</dt>
                 <dd className={`font-bold ${shippingCost === 0 ? "text-olive-600" : "text-roast-900"}`}>
