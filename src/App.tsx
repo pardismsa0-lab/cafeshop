@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   HashRouter,
   Route,
@@ -7,16 +7,21 @@ import {
   useNavigate,
   useParams,
 } from "react-router-dom";
-import AccountPage from "./components/AccountPage";
-import AdminPage from "./components/AdminPage";
-import CheckoutPage from "./components/Checkout";
 import ChatWidget from "./components/ChatWidget";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import Home from "./components/Home";
 import ProductDetail from "./components/ProductDetail";
 import { BeanIcon, CupIcon } from "./components/icons";
+
+/* ─── Code-splitting: صفحات سنگین فقط هنگام نیاز بارگذاری می‌شوند ─── */
+const CheckoutPage = lazy(() => import("./components/Checkout"));
+const AccountPage = lazy(() => import("./components/AccountPage"));
+const AdminPage = lazy(() => import("./components/AdminPage"));
+const SubscribePage = lazy(() => import("./components/SubscribePage"));
+const ComparePage = lazy(() => import("./components/ComparePage"));
 import { CATEGORY_LABELS, type CategoryId, type SortKey } from "./data/products";
+import { track } from "./lib/analytics";
 import { usePersistentCart } from "./lib/hooks";
 import { ShopProvider, useShop } from "./lib/shop-context";
 import { normalizeFa } from "./lib/utils";
@@ -136,6 +141,11 @@ function ProductPage() {
   const { products, productsLoading, addToCart, wishlist, toggleWishlist } = useShop();
   const navigate = useNavigate();
 
+  /* ردیابی بازدید محصول برای قیف آنالیتیکس */
+  useEffect(() => {
+    if (id && !productsLoading) track("view_item", { product: id });
+  }, [id, productsLoading]);
+
   if (productsLoading) return <PageLoader />;
 
   const product = products.find((p) => p.id === id);
@@ -170,14 +180,18 @@ function Shell() {
       <Header />
 
       <main>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/product/:id" element={<ProductPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/product/:id" element={<ProductPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/subscribe" element={<SubscribePage />} />
+            <Route path="/compare" element={<ComparePage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
 
       <Footer

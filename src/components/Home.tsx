@@ -10,12 +10,15 @@ import {
   type SortKey,
 } from "../data/products";
 import { useReveal } from "../lib/hooks";
+import { useShop } from "../lib/shop-context";
 import { faDigits, formatNumber } from "../lib/utils";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowIcon,
   BeanIcon,
   CartIcon,
   ChevronDownIcon,
+  CloseIcon,
   FlameIcon,
   HeartIcon,
   LeafIcon,
@@ -24,6 +27,7 @@ import {
   SearchIcon,
   StarIcon,
   SteamIcon,
+  TruckIcon,
 } from "./icons";
 import Faq from "./Faq";
 import { stockOf } from "../lib/api";
@@ -107,8 +111,10 @@ function ProductCard({
 }) {
   const stock = stockOf(product);
   const soldOut = stock === 0;
+  const { compareIds, toggleCompare } = useShop();
+  const inCompare = compareIds.includes(product.id);
   return (
-    <article className="reveal group flex flex-col overflow-hidden rounded-xl border border-roast-900/8 bg-cream-50 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift">
+    <article className="reveal group flex flex-col overflow-hidden rounded-xl border border-roast-900/8 bg-cream-50 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift dark:border-gold-500/10 dark:bg-roast-800">
       <div
         className="relative aspect-[4/3] cursor-pointer overflow-hidden bg-cream-200"
         onClick={() => onOpen(product.id)}
@@ -123,20 +129,37 @@ function ProductCard({
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-roast-950/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-        {/* علاقه‌مندی */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleWish(product);
-          }}
-          aria-label={wished ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
-          aria-pressed={wished}
-          className="absolute top-3 end-3 grid h-10 w-10 place-items-center rounded-full bg-cream-50/90 shadow-card backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-90"
-        >
-          <HeartIcon
-            className={`h-5 w-5 transition-all duration-300 ${wished ? "animate-pop fill-brick-500 stroke-brick-500" : "text-roast-700"}`}
-          />
-        </button>
+        {/* علاقه‌مندی و مقایسه */}
+        <div className="absolute top-3 end-3 flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleCompare(product.id);
+            }}
+            aria-label="افزودن به مقایسه"
+            aria-pressed={inCompare}
+            title="مقایسه"
+            className={`grid h-10 w-10 place-items-center rounded-full shadow-card backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-90 ${
+              inCompare ? "bg-gold-600 text-roast-950" : "bg-cream-50/90 text-roast-700 dark:bg-roast-900/90 dark:text-cream-100"
+            }`}
+          >
+            <ScaleIcon className="h-5 w-5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWish(product);
+            }}
+            aria-label={wished ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
+            aria-pressed={wished}
+            title="علاقه‌مندی"
+            className="grid h-10 w-10 place-items-center rounded-full bg-cream-50/90 shadow-card backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-90 dark:bg-roast-900/90"
+          >
+            <HeartIcon
+              className={`h-5 w-5 transition-all duration-300 ${wished ? "animate-pop fill-brick-500 stroke-brick-500" : "text-roast-700 dark:text-cream-100"}`}
+            />
+          </button>
+        </div>
 
         {/* موجودی */}
         {soldOut ? (
@@ -176,31 +199,31 @@ function ProductCard({
 
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold text-gold-700">
+          <span className="text-[11px] font-bold text-gold-700 dark:text-gold-400">
             {product.category === "whole"
               ? "دانه‌ی کامل"
               : product.category === "ground"
                 ? "آسیاب‌شده"
                 : "کپسولی"}
           </span>
-          <span className="flex items-center gap-1 text-xs font-bold text-roast-700">
+          <span className="flex items-center gap-1 text-xs font-bold text-roast-700 dark:text-cream-200">
             <StarIcon className="h-3.5 w-3.5 text-gold-500" />
             {faDigits(product.rating.toFixed(1))}
           </span>
         </div>
 
-        <h3 className="mt-2 text-start text-lg font-extrabold leading-8 text-roast-900">
+        <h3 className="mt-2 text-start text-lg font-extrabold leading-8 text-roast-900 dark:text-cream-50">
           <button
             onClick={() => onOpen(product.id)}
-            className="text-start transition-colors duration-300 hover:text-gold-700"
+            className="text-start transition-colors duration-300 hover:text-gold-700 dark:hover:text-gold-400"
           >
             {product.name}
           </button>
         </h3>
-        <p className="mt-1 line-clamp-2 text-sm leading-6 text-roast-600/90">{product.description}</p>
+        <p className="mt-1 line-clamp-2 text-sm leading-6 text-roast-600/90 dark:text-cream-200/70">{product.description}</p>
 
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-roast-900/8 pt-4">
-          <p className="text-[20px] font-extrabold leading-none text-gold-700">
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-roast-900/8 pt-4 dark:border-gold-500/15">
+          <p className="text-[20px] font-extrabold leading-none text-gold-700 dark:text-gold-400">
             {formatNumber(product.price)}
             <span className="text-xs font-bold text-gold-700/75"> تومان</span>
           </p>
@@ -242,6 +265,9 @@ export default function Home(props: Props) {
 
   const ref = useReveal<HTMLDivElement>([props.products, props.category, props.sort]);
   const [email, setEmail] = useState("");
+  const navigate = useNavigate();
+  const { compareIds, clearCompare, products: allProducts } = useShop();
+  const compareProducts = allProducts.filter((p) => compareIds.includes(p.id));
 
   const counts = useMemo(() => {
     const c: Record<CategoryId | "all", number> = { all: PRODUCTS.length, whole: 0, ground: 0, capsule: 0 };
@@ -589,6 +615,77 @@ export default function Home(props: Props) {
         </div>
       </section>
 
+      {/* ═══════════ اشتراک ماهانه ═══════════ */}
+      <section id="subscribe" className="relative scroll-mt-40 overflow-hidden bg-roast-950 text-cream-100">
+        <BeanIcon className="animate-floaty pointer-events-none absolute top-10 start-[6%] hidden h-9 w-9 rotate-45 text-gold-500/20 lg:block" />
+        <BeanIcon
+          className="animate-floaty pointer-events-none absolute bottom-10 end-[8%] hidden h-7 w-7 -rotate-12 text-gold-500/15 lg:block"
+          style={{ animationDelay: "1.4s" }}
+        />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 lg:grid-cols-12 lg:py-20">
+          <div className="reveal lg:col-span-7">
+            <p className="flex items-center gap-2 text-xs font-bold text-gold-400">
+              <span className="h-px w-8 bg-gold-500" />
+              اشتراک برشت‌خانه
+            </p>
+            <h2 className="font-display mt-3 text-3xl leading-[1.35] text-cream-50 md:text-4xl">
+              قهوه‌تان را به ما بسپارید؛
+              <br />
+              <span className="text-gold-400">هر سه‌شنبه، تازه دمِ درِ خانه</span>
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-8 text-cream-200/70">
+              پروفایل طعم‌تان را یک بار انتخاب کنید؛ باریستا هر دوره یک لاتِ تازه‌برشت از همان
+              خانواده می‌فرستد — با تا {faDigits(15)}٪ تخفیف و ارسال رایگان برای همیشه.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => navigate("/subscribe")}
+                className="group flex items-center gap-2 rounded-full bg-gold-500 px-7 py-3.5 text-sm font-bold text-roast-950 shadow-[0_12px_30px_-10px_rgb(196_154_108/0.7)] transition-all duration-300 hover:bg-gold-400 active:scale-95"
+              >
+                ساخت اشتراک
+                <ArrowIcon className="h-4.5 w-4.5 transition-transform duration-300 group-hover:-translate-x-1" />
+              </button>
+              <p className="text-xs font-semibold text-cream-200/60">
+                از {faDigits("272,000")} تومان در ماه · لغو در هر زمان
+              </p>
+            </div>
+          </div>
+
+          {/* بلیت */}
+          <div className="reveal lg:col-span-5" style={{ transitionDelay: "0.12s" }}>
+            <button
+              onClick={() => navigate("/subscribe")}
+              className="animate-floaty relative mx-auto block w-full max-w-sm rotate-2 rounded-xl bg-cream-50 p-6 text-start text-roast-900 shadow-lift transition-all duration-500 hover:rotate-0 hover:scale-[1.03]"
+            >
+              <div className="flex items-center justify-between">
+                <p className="font-display text-xl">بلیت اشتراک</p>
+                <span className="rounded-full bg-gold-500 px-3 py-1 text-[11px] font-extrabold text-roast-950">۱۵٪ تخفیف</span>
+              </div>
+              <div className="my-4 border-t-2 border-dashed border-roast-900/20" />
+              <div className="flex items-center gap-4">
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-roast-900 text-gold-400">
+                  <FlameIcon className="h-6 w-6" />
+                </span>
+                <div className="text-sm">
+                  <p className="font-extrabold">برشت بعدی: سه‌شنبه</p>
+                  <p className="mt-1 text-xs text-roast-600">۲۵۰ گرم · انتخاب باریستا · یادداشت دست‌نویس</p>
+                </div>
+              </div>
+              <div className="my-4 border-t-2 border-dashed border-roast-900/20" />
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold text-roast-600">
+                  <TruckIcon className="h-4 w-4 text-gold-700" />
+                  ارسال برای مشترک‌ها: رایگان
+                </span>
+                <span className="font-display -rotate-6 rounded-lg border-2 border-brick-600 px-2.5 py-0.5 text-xs text-brick-600">
+                  اشتراکی
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* ═══════════ درباره‌ی ما ═══════════ */}
       <section id="about" className="scroll-mt-40">
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 py-16 lg:grid-cols-2 lg:py-24">
@@ -681,6 +778,48 @@ export default function Home(props: Props) {
           </div>
         </div>
       </section>
+
+      {/* ═══════════ نوار شناور مقایسه ═══════════ */}
+      {compareProducts.length > 0 && (
+        <div className="animate-toast fixed bottom-5 left-1/2 z-40 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-full border border-gold-500/30 bg-roast-900/95 p-2.5 pe-4 text-cream-100 shadow-lift backdrop-blur-sm">
+            <div className="flex -space-x-2.5">
+              {compareProducts.map((p) => (
+                <img
+                  key={p.id}
+                  src={p.image}
+                  alt={p.shortName}
+                  className="h-10 w-10 rounded-full border-2 border-roast-900 object-cover"
+                />
+              ))}
+              {compareProducts.length < 2 && (
+                <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-dashed border-gold-500/50 bg-roast-800 text-gold-400">
+                  <ScaleIcon className="h-4.5 w-4.5" />
+                </span>
+              )}
+            </div>
+            <p className="min-w-0 flex-1 text-[11px] font-bold leading-5">
+              {compareProducts.length === 1
+                ? "یک محصول دیگر برای مقایسه انتخاب کنید"
+                : "دو محصول آماده‌ی کاپینگ‌اند!"}
+            </p>
+            <button
+              onClick={() => navigate("/compare")}
+              disabled={compareProducts.length < 2}
+              className="shrink-0 rounded-full bg-gold-500 px-5 py-2.5 text-xs font-extrabold text-roast-950 transition-all hover:bg-gold-400 active:scale-95 disabled:opacity-35"
+            >
+              مقایسه
+            </button>
+            <button
+              onClick={clearCompare}
+              aria-label="پاک‌کردن مقایسه"
+              className="shrink-0 rounded-full p-2 text-cream-200/70 transition-colors hover:text-brick-500"
+            >
+              <CloseIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

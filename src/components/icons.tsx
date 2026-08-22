@@ -280,3 +280,23 @@ export const LockIcon = (p: P) => (
     <circle cx="12" cy="15.2" r="1.2" fill="currentColor" stroke="none" />
   </svg>
 );
+
+export const MoonIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M20 13.2A8 8 0 0 1 10.8 4a8 8 0 1 0 9.2 9.2z" />
+  </svg>
+);
+
+export const SunIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19" />
+  </svg>
+);
+
+export const CameraIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M4 7.5h2.5l1.4-2h8.2l1.4 2H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z" />
+    <circle cx="12" cy="13" r="3.6" />
+  </svg>
+);

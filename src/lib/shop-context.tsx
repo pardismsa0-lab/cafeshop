@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, stockOf, type User } from "./api";
+import { track } from "./analytics";
 import { usePersistentCart } from "./hooks";
 import type { Product } from "../data/products";
 import AuthModal from "../components/AuthModal";
@@ -58,6 +59,10 @@ interface ShopCtxType {
 
   wishlist: string[];
   toggleWishlist: (product: Product) => void;
+
+  compareIds: string[];
+  toggleCompare: (id: string) => void;
+  clearCompare: () => void;
 
   pushToast: (message: string, kind?: ToastKind) => void;
   sendSms: (body: string) => void;
@@ -143,6 +148,25 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     },
     [navigate],
   );
+
+  /* ───── مقایسه‌ی محصولات ───── */
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+
+  const toggleCompare = useCallback(
+    (id: string) => {
+      setCompareIds((prev) => {
+        if (prev.includes(id)) return prev.filter((x) => x !== id);
+        if (prev.length >= 2) {
+          pushToast("حداکثر ۲ محصول قابل مقایسه است؛ ابتدا یکی را حذف کنید", "info");
+          return prev;
+        }
+        return [...prev, id];
+      });
+    },
+    [pushToast],
+  );
+
+  const clearCompare = useCallback(() => setCompareIds([]), []);
 
   /* ───── پنل‌ها ───── */
   const [cartOpen, setCartOpen] = useState(false);
@@ -236,6 +260,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setUser,
     wishlist,
     toggleWishlist,
+    compareIds,
+    toggleCompare,
+    clearCompare,
     pushToast,
     sendSms,
   };

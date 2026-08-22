@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
   --font-display: "Lalezar", "Vazirmatn", serif;
@@ -110,6 +112,20 @@
       radial-gradient(60rem 42rem at 88% -6rem, rgb(196 154 108 / 0.14), transparent 60%),
       radial-gradient(52rem 38rem at -12% 32rem, rgb(78 52 46 / 0.07), transparent 62%);
     background-attachment: fixed;
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+  .dark body {
+    background-color: #170b05;
+    color: #f3e3cd;
+    background-image:
+      radial-gradient(60rem 42rem at 88% -6rem, rgb(196 154 108 / 0.09), transparent 60%),
+      radial-gradient(52rem 38rem at -12% 32rem, rgb(196 154 108 / 0.05), transparent 62%);
+  }
+  .dark .shadow-card {
+    box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.55);
+  }
+  .dark .shadow-lift {
+    box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.7);
   }
   /* دانه‌ی بافت (grain) روی کل صفحه برای حس کاغذ کاهی */
   body::after {

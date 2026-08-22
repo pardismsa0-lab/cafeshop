@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
-import { CATEGORY_LABELS, PRODUCTS, type Product } from "../data/products";
-import { stockOf } from "../lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CATEGORY_LABELS, PRODUCTS, type Product, type Review } from "../data/products";
+import { api, stockOf, type UserReview } from "../lib/api";
 import { useJsonLd, usePageMeta } from "../lib/seo";
+import { useShop } from "../lib/shop-context";
 import { faDigits, formatNumber, formatToman } from "../lib/utils";
-import { HeartIcon } from "./icons";
+import { CameraIcon, CloseIcon, HeartIcon } from "./icons";
 import {
   BackIcon,
   CartIcon,
@@ -57,6 +58,90 @@ export default function ProductDetail({
 }: Props) {
   const [qty, setQty] = useState(1);
   const [voted, setVoted] = useState<Record<string, boolean>>({});
+  const { pushToast, user } = useShop();
+
+  /* ───── نظرات کاربران (با عکس) ───── */
+  const [extraReviews, setExtraReviews] = useState<UserReview[]>([]);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [reviewForm, setReviewForm] = useState({ author: "", rating: 0, text: "", photo: "" as string | null });
+  const [reviewError, setReviewError] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setExtraReviews(api.getExtraReviews(product.id));
+    setReviewForm((f) => ({ ...f, author: user?.name?.trim() ?? "", rating: 0, text: "", photo: null }));
+  }, [product.id, user]);
+
+  /** کوچک‌سازی عکس برای ذخیره‌ی سبک در مرورگر */
+  const downscalePhoto = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const max = 640;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.72));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("image"));
+      };
+      img.src = url;
+    });
+
+  const onPickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const dataUrl = await downscalePhoto(file);
+      setReviewForm((f) => ({ ...f, photo: dataUrl }));
+      setReviewError("");
+    } catch {
+      setReviewError("خواندن عکس ممکن نشد؛ فایل دیگری امتحان کنید.");
+    }
+  };
+
+  const submitReview = async () => {
+    if (savingReview) return;
+    if (reviewForm.author.trim().length < 2) return setReviewError("نام‌تان را بنویسید.");
+    if (reviewForm.rating === 0) return setReviewError("امتیاز ستاره‌ای را انتخاب کنید.");
+    if (reviewForm.text.trim().length < 5) return setReviewError("چند کلمه‌ای درباره‌ی تجربه‌تان بنویسید.");
+    setReviewError("");
+    setSavingReview(true);
+    const saved = await api.addReview(product.id, {
+      author: reviewForm.author.trim(),
+      rating: reviewForm.rating,
+      text: reviewForm.text.trim(),
+      photo: reviewForm.photo ?? undefined,
+      verified: Boolean(user),
+    });
+    setExtraReviews((list) => [saved, ...list]);
+    setReviewForm((f) => ({ ...f, rating: 0, text: "", photo: null }));
+    setSavingReview(false);
+    pushToast("نظر شما ثبت شد؛ ممنون که تجربه‌تان را گفتید ☕");
+  };
+
+  const mergedReviews: (Review & { photo?: string })[] = useMemo(
+    () => [
+      ...extraReviews.map((r) => ({
+        id: r.id,
+        author: r.author,
+        date: r.date,
+        rating: r.rating,
+        text: r.text,
+        helpful: 0,
+        verified: r.verified ?? false,
+        photo: r.photo,
+      })),
+      ...product.customerReviews,
+    ],
+    [extraReviews, product.customerReviews],
+  );
   const stock = stockOf(product);
   const soldOut = stock === 0;
   const maxQty = Math.max(1, Math.min(MAX_QTY, stock));
@@ -328,53 +413,165 @@ export default function ProductDetail({
           </div>
         </div>
 
-        <ul className="space-y-4">
-          {product.customerReviews.map((r, idx) => {
-            const hasVoted = voted[r.id];
-            return (
-              <li
-                key={r.id}
-                className="animate-fade-up rounded-xl border border-roast-900/10 bg-cream-50 p-5 shadow-card transition-all duration-300 hover:border-gold-600/40 hover:shadow-lift"
-                style={{ animationDelay: `${idx * 0.1}s` }}
+        <div className="min-w-0">
+          {/* فرم ثبت نظر با عکس */}
+          <div className="animate-fade-up rounded-xl border-2 border-dashed border-gold-600/40 bg-cream-50 p-5 shadow-card dark:border-gold-500/30 dark:bg-roast-800">
+            <h3 className="font-display text-xl text-roast-900 dark:text-cream-50">تجربه‌ی شما از این لات؟</h3>
+            <div className="mt-3.5 grid gap-3.5 sm:grid-cols-2">
+              <input
+                value={reviewForm.author}
+                onChange={(e) => setReviewForm((f) => ({ ...f, author: e.target.value }))}
+                placeholder="نام شما"
+                aria-label="نام نویسنده‌ی نظر"
+                className="rounded-xl border border-roast-900/15 bg-cream-100 px-4 py-3 text-sm transition-all focus:border-gold-600 focus:outline-none dark:border-gold-500/20 dark:bg-roast-900 dark:text-cream-100"
+              />
+              {/* ستاره‌های انتخابی */}
+              <div className="flex items-center gap-1 rounded-xl border border-roast-900/15 bg-cream-100 px-4 py-2.5 dark:border-gold-500/20 dark:bg-roast-900" role="radiogroup" aria-label="امتیاز">
+                <span className="ms-auto me-1 text-[11px] font-bold text-roast-600 dark:text-cream-200/70">
+                  {reviewForm.rating ? `${faDigits(reviewForm.rating)} از ۵` : "امتیاز بدهید"}
+                </span>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setReviewForm((f) => ({ ...f, rating: i }))}
+                    aria-label={`${faDigits(i)} ستاره`}
+                    className="p-0.5 transition-transform hover:scale-125 active:scale-95"
+                  >
+                    <StarIcon className={`h-6 w-6 transition-colors ${i <= reviewForm.rating ? "text-gold-500" : "text-roast-900/15 dark:text-cream-100/20"}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <textarea
+              value={reviewForm.text}
+              onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))}
+              rows={3}
+              placeholder="طعم، عطر، روش دمی که استفاده کردید…"
+              aria-label="متن نظر"
+              className="mt-3.5 w-full resize-none rounded-xl border border-roast-900/15 bg-cream-100 px-4 py-3 text-sm leading-7 transition-all focus:border-gold-600 focus:outline-none dark:border-gold-500/20 dark:bg-roast-900 dark:text-cream-100"
+            />
+
+            <div className="mt-3.5 flex flex-wrap items-center gap-3">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void onPickPhoto(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-2 rounded-full border border-roast-900/15 px-4 py-2.5 text-xs font-bold text-roast-700 transition-all hover:border-gold-600 hover:text-gold-700 active:scale-95 dark:border-gold-500/25 dark:text-cream-200"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <span className="font-display grid h-11 w-11 place-items-center rounded-full bg-gold-500/25 text-xl text-gold-700">
-                      {r.author.trim()[0]}
-                    </span>
-                    <div>
-                      <p className="text-sm font-extrabold text-roast-900">
-                        {r.author}
-                        {r.verified && (
-                          <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-olive-600/12 px-2 py-0.5 text-[10px] font-bold text-olive-600">
-                            <CheckIcon className="h-3 w-3" strokeWidth={3} />
-                            خرید تأییدشده
-                          </span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-roast-600">{r.date}</p>
-                    </div>
-                  </div>
-                  <Stars rating={r.rating} size="h-3.5 w-3.5" />
-                </div>
-                <p className="mt-3.5 text-sm leading-8 text-roast-700">{r.text}</p>
-                <button
-                  onClick={() => setVoted((v) => ({ ...v, [r.id]: true }))}
-                  disabled={hasVoted}
-                  className={`mt-3.5 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-300 active:scale-95 ${
-                    hasVoted
-                      ? "bg-olive-600/15 text-olive-600"
-                      : "bg-roast-900/6 text-roast-600 hover:bg-gold-500/20 hover:text-gold-700"
-                  }`}
+                <CameraIcon className="h-4.5 w-4.5" />
+                عکس فنجان‌تان
+              </button>
+              {reviewForm.photo && (
+                <span className="animate-pop relative">
+                  <img src={reviewForm.photo} alt="پیش‌نمایش عکس" className="h-14 w-14 rounded-lg border-2 border-gold-500 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setReviewForm((f) => ({ ...f, photo: null }))}
+                    aria-label="حذف عکس"
+                    className="absolute -top-1.5 -end-1.5 grid h-5 w-5 place-items-center rounded-full bg-brick-600 text-cream-50 transition-transform hover:scale-110"
+                  >
+                    <CloseIcon className="h-3 w-3" strokeWidth={2.6} />
+                  </button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => void submitReview()}
+                disabled={savingReview}
+                className="ms-auto rounded-full bg-gold-600 px-6 py-2.5 text-xs font-extrabold text-roast-950 transition-all hover:bg-gold-500 active:scale-95 disabled:opacity-60"
+              >
+                {savingReview ? "در حال ثبت…" : "ثبت نظر"}
+              </button>
+            </div>
+            {reviewError && <p className="animate-fade-up mt-3 text-[11px] font-bold text-brick-600">{reviewError}</p>}
+          </div>
+
+          {/* فهرست نظرات */}
+          <ul className="mt-5 space-y-4">
+            {mergedReviews.map((r, idx) => {
+              const hasVoted = voted[r.id];
+              return (
+                <li
+                  key={r.id}
+                  className="animate-fade-up rounded-xl border border-roast-900/10 bg-cream-50 p-5 shadow-card transition-all duration-300 hover:border-gold-600/40 hover:shadow-lift dark:border-gold-500/10 dark:bg-roast-800"
+                  style={{ animationDelay: `${Math.min(idx, 4) * 0.08}s` }}
                 >
-                  {hasVoted ? <CheckIcon className="h-3.5 w-3.5" /> : null}
-                  {hasVoted ? "رأی شما ثبت شد" : "مفید بود"} ({faDigits(r.helpful + (hasVoted ? 1 : 0))})
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="font-display grid h-11 w-11 place-items-center rounded-full bg-gold-500/25 text-xl text-gold-700 dark:text-gold-400">
+                        {r.author.trim()[0]}
+                      </span>
+                      <div>
+                        <p className="text-sm font-extrabold text-roast-900 dark:text-cream-50">
+                          {r.author}
+                          {r.verified && (
+                            <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-olive-600/12 px-2 py-0.5 text-[10px] font-bold text-olive-600 dark:text-olive-500">
+                              <CheckIcon className="h-3 w-3" strokeWidth={3} />
+                              خرید تأییدشده
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-roast-600 dark:text-cream-200/60">{r.date}</p>
+                      </div>
+                    </div>
+                    <Stars rating={r.rating} size="h-3.5 w-3.5" />
+                  </div>
+
+                  {r.photo && (
+                    <button
+                      onClick={() => setLightbox(r.photo!)}
+                      className="group/photo relative mt-3.5 block overflow-hidden rounded-lg"
+                      aria-label="نمایش بزرگ عکس"
+                    >
+                      <img
+                        src={r.photo}
+                        alt={`عکس فنجان از ${r.author}`}
+                        loading="lazy"
+                        className="h-28 w-40 object-cover transition-transform duration-500 group-hover/photo:scale-110"
+                      />
+                      <span className="absolute inset-0 grid place-items-center bg-roast-950/0 text-cream-50 opacity-0 transition-all duration-300 group-hover/photo:bg-roast-950/35 group-hover/photo:opacity-100">
+                        <CameraIcon className="h-6 w-6" />
+                      </span>
+                    </button>
+                  )}
+
+                  <p className="mt-3.5 text-sm leading-8 text-roast-700 dark:text-cream-200/85">{r.text}</p>
+                  <button
+                    onClick={() => setVoted((v) => ({ ...v, [r.id]: true }))}
+                    disabled={hasVoted}
+                    className={`mt-3.5 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-300 active:scale-95 ${
+                      hasVoted
+                        ? "bg-olive-600/15 text-olive-600 dark:text-olive-500"
+                        : "bg-roast-900/6 text-roast-600 hover:bg-gold-500/20 hover:text-gold-700 dark:bg-cream-100/10 dark:text-cream-200/70"
+                    }`}
+                  >
+                    {hasVoted ? <CheckIcon className="h-3.5 w-3.5" /> : null}
+                    {hasVoted ? "رأی شما ثبت شد" : "مفید بود"} ({faDigits(r.helpful + (hasVoted ? 1 : 0))})
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </section>
+
+      {/* لایت‌باکس عکس نظر */}
+      {lightbox && (
+        <button
+          onClick={() => setLightbox(null)}
+          className="animate-fade-up fixed inset-0 z-[75] grid place-items-center bg-roast-950/90 p-6 backdrop-blur-sm"
+          aria-label="بستن نمایشگر عکس"
+        >
+          <img src={lightbox} alt="عکس بزرگ فنجان مشتری" className="max-h-[82dvh] max-w-full rounded-xl shadow-lift ring-2 ring-gold-500/40" />
+        </button>
+      )}
 
       {/* ═══════════ شاید بپسندید ═══════════ */}
       <section className="mt-16">

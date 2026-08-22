@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BRAND } from "../data/products";
 import { useShop } from "../lib/shop-context";
@@ -8,8 +8,10 @@ import {
   CloseIcon,
   CupIcon,
   MenuIcon,
+  MoonIcon,
   PackageIcon,
   SearchIcon,
+  SunIcon,
   TruckIcon,
   UserIcon,
 } from "./icons";
@@ -25,6 +27,34 @@ export default function Header() {
   const navigate = useNavigate();
   const { cartCount, query, setQuery, setCartOpen, setOrdersOpen, setAuthOpen, user } = useShop();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dark, setDark] = useState(() => {
+    try {
+      const saved = localStorage.getItem("aod-dark");
+      if (saved !== null) return saved === "1";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleDark = () => {
+    setDark((d) => {
+      const next = !d;
+      document.documentElement.classList.toggle("dark", next);
+      try {
+        localStorage.setItem("aod-dark", next ? "1" : "0");
+      } catch {
+        /* — */
+      }
+      return next;
+    });
+  };
+
+  /* اعمال سلیقه‌ی ذخیره‌شده هنگام بارگذاری */
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const goSection = (id: string) => {
     setMenuOpen(false);
@@ -93,10 +123,26 @@ export default function Header() {
                 {item.label}
               </button>
             ))}
+            <button
+              onClick={() => navigate("/subscribe")}
+              className="relative rounded-full bg-gold-500/15 px-3.5 py-2 text-sm font-bold text-gold-300 ring-1 ring-gold-500/30 transition-all duration-300 hover:bg-gold-500 hover:text-roast-950"
+            >
+              اشتراک ماهانه
+            </button>
           </nav>
 
           {/* جستجوی دسکتاپ */}
           <div className="ms-auto hidden w-full max-w-xs lg:block">{searchBox()}</div>
+
+          {/* حالت تاریک */}
+          <button
+            onClick={toggleDark}
+            aria-label={dark ? "حالت روشن" : "حالت تاریک"}
+            title={dark ? "حالت روشن" : "حالت تاریک"}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-gold-500/30 bg-roast-800 text-gold-300 transition-all duration-300 hover:border-gold-500/70 hover:text-gold-200 active:scale-90"
+          >
+            {dark ? <SunIcon className="h-5 w-5 transition-transform duration-500 hover:rotate-45" /> : <MoonIcon className="h-5 w-5 transition-transform duration-500 hover:-rotate-12" />}
+          </button>
 
           {/* حساب کاربری */}
           <button

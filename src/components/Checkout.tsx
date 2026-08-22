@@ -10,6 +10,8 @@ import {
   type ShippingMethod,
 } from "../data/products";
 import { usePageMeta } from "../lib/seo";
+import { track } from "../lib/analytics";
+import { pointsForPurchase } from "../lib/cart-logic";
 import { useShop } from "../lib/shop-context";
 import { faDigits, formatToman, isValidPhone } from "../lib/utils";
 import PaymentGateway from "./PaymentGateway";
@@ -33,6 +35,7 @@ interface OrderReceipt {
   shippingLabel: string;
   paymentLabel: string;
   total: number;
+  pointsEarned?: number;
 }
 
 const SHIPPING_ICONS: Record<ShippingMethod["id"], typeof TruckIcon> = {
@@ -129,6 +132,15 @@ export default function CheckoutPage() {
       shippingCost,
       total,
     });
+    /* آنالیتیکس: رویداد خرید */
+    track("purchase", { total: saved.total, items: saved.items.length });
+
+    /* باشگاه مشتریان: اهدای امتیاز به شماره‌ی گیرنده (با ورود، قابل مشاهده می‌شود) */
+    const pointsEarned = pointsForPurchase(saved.total);
+    if (pointsEarned > 0) {
+      void api.awardPoints(phone.trim(), pointsEarned);
+    }
+
     setOrder({
       code: saved.code,
       date: saved.date,
@@ -136,6 +148,7 @@ export default function CheckoutPage() {
       shippingLabel: saved.shippingLabel,
       paymentLabel: saved.paymentLabel,
       total: saved.total,
+      pointsEarned,
     });
     sendSms(
       `آتش‌ودانه\nسفارش شما با موفقیت ثبت شد.\nکد پیگیری: ${saved.code}\nوضعیت: در حال آماده‌سازی ☕`,

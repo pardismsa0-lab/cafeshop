@@ -5,8 +5,18 @@
  * و داده‌ها در localStorage ماندگارند. با اتصال بک‌اند واقعی،
  * فقط همین فایل جایگزین می‌شود و بقیه‌ی برنامه دست نمی‌خورد.
  */
-import { PRODUCTS, type Product } from "../data/products";
+import { COUPONS, PRODUCTS, type Product, type SubscriptionPlan } from "../data/products";
 import { faDigits, makeTrackingCode, todayFa } from "./utils";
+
+export interface UserReview {
+  id: string;
+  author: string;
+  rating: number;
+  text: string;
+  date: string;
+  photo?: string;
+  verified?: boolean;
+}
 
 export type OrderStatus = "preparing" | "shipping" | "delivered";
 
@@ -282,6 +292,78 @@ export const api = {
 
   adminLogout() {
     sessionStorage.removeItem(K.admin);
+  },
+
+  /* ═══ اشتراک ماهانه ═══ */
+  getSubscription(): SubscriptionPlan | null {
+    return read<SubscriptionPlan | null>("aod-subscription", null);
+  },
+
+  async subscribe(plan: SubscriptionPlan): Promise<void> {
+    await delay(550);
+    write("aod-subscription", plan);
+  },
+
+  async cancelSubscription(): Promise<void> {
+    await delay(300);
+    localStorage.removeItem("aod-subscription");
+  },
+
+  /* ═══ باشگاه مشتریان ═══ */
+  getPoints(phone: string): number {
+    return read<Record<string, number>>("aod-points", {})[phone] ?? 0;
+  },
+
+  async awardPoints(phone: string, pts: number): Promise<number> {
+    await delay(200);
+    const all = read<Record<string, number>>("aod-points", {});
+    all[phone] = (all[phone] ?? 0) + pts;
+    write("aod-points", all);
+    return all[phone];
+  },
+
+  getUserCoupons(phone: string): { code: string; percent: number; used: boolean }[] {
+    return read("aod-user-coupons-" + phone, []);
+  },
+
+  async redeemPoints(
+    phone: string,
+    cost: number,
+    percent: number,
+  ): Promise<{ code: string }> {
+    await delay(400);
+    const points = api.getPoints(phone);
+    if (points < cost) throw new Error("امتیاز کافی نیست");
+    const all = read<Record<string, number>>("aod-points", {});
+    all[phone] = points - cost;
+    write("aod-points", all);
+    const code = `ATASH${Math.floor(100 + Math.random() * 900)}`;
+    const coupons = api.getUserCoupons(phone);
+    write("aod-user-coupons-" + phone, [...coupons, { code, percent, used: false }]);
+    return { code };
+  },
+
+  /** جست‌وجوی کد تخفیف: کدهای عمومی + کدهای باشگاه مشتریان */
+  lookupCoupon(code: string, phone: string | null): number | null {
+    const normalized = code.trim().toUpperCase();
+    if (COUPONS[normalized]) return COUPONS[normalized];
+    if (phone) {
+      const found = api.getUserCoupons(phone).find((c) => c.code === normalized && !c.used);
+      if (found) return found.percent;
+    }
+    return null;
+  },
+
+  /* ═══ نظرات مشتریان (با عکس) ═══ */
+  getExtraReviews(productId: string): UserReview[] {
+    return read<UserReview[]>(`aod-reviews-${productId}`, []);
+  },
+
+  async addReview(productId: string, review: Omit<UserReview, "id" | "date">): Promise<UserReview> {
+    await delay(450);
+    const full: UserReview = { ...review, id: `ur-${Date.now()}`, date: todayFa() };
+    write(`aod-reviews-${productId}`, [full, ...api.getExtraReviews(productId)]);
+    return full;
   },
 };
 

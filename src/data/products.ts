@@ -397,3 +397,48 @@ export const PAYMENT_METHODS: { id: "online" | "cod"; label: string; hint: strin
 ];
 
 export const BRAND = "آتش‌ودانه";
+
+/* ═══════════ امتیازهای کاپینگ (برای برگه‌ی مقایسه) ═══════════ */
+export interface CuppingScores {
+  acidity: number;
+  body: number;
+  sweetness: number;
+  aroma: number;
+}
+
+export const CUPPING_SCORES: Record<string, CuppingScores> = {
+  "ethiopia-yirgacheffe": { acidity: 5, body: 2, sweetness: 3, aroma: 5 },
+  "colombia-supremo": { acidity: 3, body: 3, sweetness: 4, aroma: 4 },
+  "baron-espresso": { acidity: 2, body: 5, sweetness: 2, aroma: 4 },
+  "brazil-santos": { acidity: 2, body: 4, sweetness: 5, aroma: 3 },
+  "lungo-capsule": { acidity: 3, body: 3, sweetness: 3, aroma: 3 },
+  "swiss-water-decaf": { acidity: 2, body: 3, sweetness: 4, aroma: 3 },
+};
+
+/* ═══════════ اشتراک ماهانه ═══════════ */
+export const SUBSCRIPTION = {
+  sizes: [
+    { id: "250", label: "۲۵۰ گرم", price: 320_000 },
+    { id: "500", label: "۵۰۰ گرم", price: 580_000 },
+  ],
+  frequencies: [
+    { id: "monthly", label: "ماهانه", percent: 15 },
+    { id: "biweekly", label: "هر دو هفته", percent: 10 },
+  ],
+  profiles: [
+    { id: "surprise", label: "انتخاب باریستا", hint: "هر بار یک سورپرایز تازه‌برشت" },
+    { id: "bright", label: "روشن و گلی", hint: "اسیدیته‌ی بالا، نت‌های مرکباتی" },
+    { id: "balanced", label: "متعادل", hint: "شیرینی و بدنه‌ی هم‌تراز" },
+    { id: "dark", label: "تیره و شکلاتی", hint: "پرکرم، مناسب اسپرسو" },
+  ],
+};
+
+export interface SubscriptionPlan {
+  sizeId: string;
+  freqId: string;
+  profileId: string;
+  price: number;
+  percent: number;
+  startedAt: string;
+  nextDelivery: string;
+}
