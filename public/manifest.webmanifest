@@ -1,0 +1,20 @@
+{
+  "name": "آتش‌ودانه | فروشگاه قهوه‌ی تخصصی",
+  "short_name": "آتش‌ودانه",
+  "description": "خرید آنلاین قهوه‌های تخصصی تازه‌برشت؛ سینگل‌اورجین، اسپرسو، کلدبرو و کپسول.",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#2c1810",
+  "background_color": "#faf0e6",
+  "icons": [
+    {
+      "src": "https://image.qwenlm.ai/generated-images/e8dd0f6d-142e-4e00-ad60-df7ee97b5745/_result.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

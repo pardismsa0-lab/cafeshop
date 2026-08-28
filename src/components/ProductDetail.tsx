@@ -1,0 +1,649 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CATEGORY_LABELS, PRODUCTS, type Product, type Review } from "../data/products";
+import { api, stockOf, type UserReview } from "../lib/api";
+import { useJsonLd, usePageMeta } from "../lib/seo";
+import { useShop } from "../lib/shop-context";
+import { faDigits, formatNumber, formatToman } from "../lib/utils";
+import { CameraIcon, CloseIcon, HeartIcon } from "./icons";
+import {
+  BackIcon,
+  CartIcon,
+  CheckIcon,
+  FlameIcon,
+  LeafIcon,
+  MinusIcon,
+  PackageIcon,
+  PinIcon,
+  PlusIcon,
+  ScaleIcon,
+  ShieldIcon,
+  StarIcon,
+  SteamIcon,
+  TruckIcon,
+} from "./icons";
+
+interface Props {
+  product: Product;
+  related?: Product[];
+  wished?: boolean;
+  onToggleWishlist?: (product: Product) => void;
+  onBack: () => void;
+  onAdd: (product: Product, qty: number) => void;
+  onOpenProduct: (id: string) => void;
+}
+
+const MAX_QTY = 10;
+
+function Stars({ rating, size = "h-4 w-4" }: { rating: number; size?: string }) {
+  return (
+    <span className="flex items-center gap-0.5" aria-label={`امتیاز ${faDigits(rating.toFixed(1))} از ۵`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <StarIcon
+          key={i}
+          className={`${size} ${i <= Math.round(rating) ? "text-gold-500" : "text-roast-900/15"}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+export default function ProductDetail({
+  product,
+  related: relatedProp,
+  wished = false,
+  onToggleWishlist,
+  onBack,
+  onAdd,
+  onOpenProduct,
+}: Props) {
+  const [qty, setQty] = useState(1);
+  const [voted, setVoted] = useState<Record<string, boolean>>({});
+  const { pushToast, user } = useShop();
+
+  /* ───── نظرات کاربران (با عکس) ───── */
+  const [extraReviews, setExtraReviews] = useState<UserReview[]>([]);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [reviewForm, setReviewForm] = useState({ author: "", rating: 0, text: "", photo: "" as string | null });
+  const [reviewError, setReviewError] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setExtraReviews(api.getExtraReviews(product.id));
+    setReviewForm((f) => ({ ...f, author: user?.name?.trim() ?? "", rating: 0, text: "", photo: null }));
+  }, [product.id, user]);
+
+  /** کوچک‌سازی عکس برای ذخیره‌ی سبک در مرورگر */
+  const downscalePhoto = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const max = 640;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.72));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("image"));
+      };
+      img.src = url;
+    });
+
+  const onPickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const dataUrl = await downscalePhoto(file);
+      setReviewForm((f) => ({ ...f, photo: dataUrl }));
+      setReviewError("");
+    } catch {
+      setReviewError("خواندن عکس ممکن نشد؛ فایل دیگری امتحان کنید.");
+    }
+  };
+
+  const submitReview = async () => {
+    if (savingReview) return;
+    if (reviewForm.author.trim().length < 2) return setReviewError("نام‌تان را بنویسید.");
+    if (reviewForm.rating === 0) return setReviewError("امتیاز ستاره‌ای را انتخاب کنید.");
+    if (reviewForm.text.trim().length < 5) return setReviewError("چند کلمه‌ای درباره‌ی تجربه‌تان بنویسید.");
+    setReviewError("");
+    setSavingReview(true);
+    const saved = await api.addReview(product.id, {
+      author: reviewForm.author.trim(),
+      rating: reviewForm.rating,
+      text: reviewForm.text.trim(),
+      photo: reviewForm.photo ?? undefined,
+      verified: Boolean(user),
+    });
+    setExtraReviews((list) => [saved, ...list]);
+    setReviewForm((f) => ({ ...f, rating: 0, text: "", photo: null }));
+    setSavingReview(false);
+    pushToast("نظر شما ثبت شد؛ ممنون که تجربه‌تان را گفتید ☕");
+  };
+
+  const mergedReviews: (Review & { photo?: string })[] = useMemo(
+    () => [
+      ...extraReviews.map((r) => ({
+        id: r.id,
+        author: r.author,
+        date: r.date,
+        rating: r.rating,
+        text: r.text,
+        helpful: 0,
+        verified: r.verified ?? false,
+        photo: r.photo,
+      })),
+      ...product.customerReviews,
+    ],
+    [extraReviews, product.customerReviews],
+  );
+  const stock = stockOf(product);
+  const soldOut = stock === 0;
+  const maxQty = Math.max(1, Math.min(MAX_QTY, stock));
+
+  usePageMeta(
+    `${product.name} | آتش‌ودانه`,
+    `${product.description} — قیمت: ${formatNumber(product.price)} تومان`,
+  );
+
+  useJsonLd(`jsonld-${product.id}`, {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    image: product.image,
+    description: product.longDescription,
+    brand: { "@type": "Brand", name: "آتش‌ودانه" },
+    aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating, reviewCount: product.reviews },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "IRR",
+      price: product.price * 10,
+      availability: soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+    },
+  });
+
+  const spec = [
+    { icon: FlameIcon, label: "تاریخ برشت", value: product.details.roastDate },
+    { icon: PinIcon, label: "خاستگاه", value: product.details.origin },
+    { icon: LeafIcon, label: "روش فرآوری", value: product.details.process },
+    { icon: ScaleIcon, label: "ارتفاع کشت", value: product.details.altitude },
+  ];
+
+  const related = useMemo(() => {
+    const others = relatedProp ?? PRODUCTS.filter((p) => p.id !== product.id);
+    const sameCategory = others.filter((p) => p.category === product.category);
+    const rest = others.filter((p) => p.category !== product.category);
+    return [...sameCategory, ...rest.sort((a, b) => b.popularity - a.popularity)].slice(0, 3);
+  }, [product]);
+
+  return (
+    <div className="animate-fade-up mx-auto max-w-6xl px-4 py-10">
+      {/* بازگشت */}
+      <button
+        onClick={onBack}
+        className="group flex items-center gap-2 rounded-full border border-roast-900/15 bg-cream-50 px-4 py-2.5 text-sm font-bold text-roast-700 shadow-card transition-all duration-300 hover:border-gold-600 hover:text-gold-700 active:scale-95"
+      >
+        <BackIcon className="h-4.5 w-4.5 transition-transform duration-300 group-hover:translate-x-1" />
+        بازگشت به فروشگاه
+      </button>
+
+      {/* breadcrumb */}
+      <nav className="mt-5 flex items-center gap-2 text-xs text-roast-600" aria-label="مسیر">
+        <button onClick={onBack} className="transition-colors hover:text-gold-700">
+          فروشگاه
+        </button>
+        <span className="text-roast-900/30">/</span>
+        <span className="transition-colors">{CATEGORY_LABELS[product.category]}</span>
+        <span className="text-roast-900/30">/</span>
+        <span className="font-bold text-gold-700">{product.shortName}</span>
+      </nav>
+
+      <div className="mt-7 grid gap-10 lg:grid-cols-2 lg:gap-14">
+        {/* تصویر */}
+        <div className="relative">
+          <div className="absolute -inset-4 rotate-1 rounded-[22px] border border-gold-600/25" aria-hidden />
+          <div className="relative overflow-hidden rounded-xl shadow-lift">
+            <img
+              src={product.image}
+              alt={product.name}
+              className="aspect-square w-full object-cover transition-transform duration-700 hover:scale-[1.04]"
+            />
+            {product.badge && (
+              <span
+                className={`absolute top-4 start-4 rounded-full px-3.5 py-1.5 text-xs font-bold shadow-card ${
+                  product.badge === "bestseller"
+                    ? "bg-gold-500 text-roast-950"
+                    : "bg-olive-600 text-cream-50"
+                }`}
+              >
+                {product.badge === "bestseller" ? "پرفروش" : "جدید"}
+              </span>
+            )}
+          </div>
+          <SteamIcon className="pointer-events-none absolute -top-3 start-1/4 h-14 w-14 text-roast-900/40" />
+          <span className="animate-floaty absolute -bottom-5 end-6 flex items-center gap-2 rounded-full bg-roast-900 px-5 py-2.5 text-xs font-bold text-cream-100 shadow-lift">
+            <FlameIcon className="h-4 w-4 text-gold-400" />
+            برشت: {product.details.roastDate}
+          </span>
+        </div>
+
+        {/* اطلاعات */}
+        <div className="pt-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-full bg-gold-500/20 px-3.5 py-1.5 text-[11px] font-bold text-gold-700">
+              {CATEGORY_LABELS[product.category]}
+            </span>
+            {onToggleWishlist && (
+              <button
+                onClick={() => onToggleWishlist(product)}
+                aria-pressed={wished}
+                aria-label={wished ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
+                className="flex items-center gap-1.5 rounded-full border border-roast-900/12 bg-cream-50 px-3.5 py-1.5 text-[11px] font-bold text-roast-700 shadow-card transition-all duration-300 hover:border-brick-500/50 hover:text-brick-600 active:scale-95"
+              >
+                <HeartIcon className={`h-4 w-4 transition-all ${wished ? "animate-pop fill-brick-500 stroke-brick-500" : ""}`} />
+                {wished ? "در علاقه‌مندی‌ها" : "علاقه‌مندی"}
+              </button>
+            )}
+            <span className="flex items-center gap-1.5 text-sm font-bold text-roast-700">
+              <Stars rating={product.rating} />
+              {faDigits(product.rating.toFixed(1))}
+              <a
+                href="#reviews"
+                className="font-medium text-roast-600 underline decoration-gold-600/50 underline-offset-4 transition-colors hover:text-gold-700"
+              >
+                ({faDigits(product.reviews)} نظر)
+              </a>
+            </span>
+          </div>
+
+          <h1 className="font-display mt-4 text-3xl leading-[1.4] text-roast-900 md:text-4xl">
+            {product.name}
+          </h1>
+
+          <p className="mt-4 text-[15px] leading-8 text-roast-600">{product.longDescription}</p>
+
+          <p className="mt-6 text-[24px] font-extrabold leading-none text-gold-700">
+            {formatNumber(product.price)}
+            <span className="text-sm font-bold text-gold-700/75"> تومان</span>
+            {soldOut ? (
+              <span className="ms-3 align-middle text-[11px] font-bold text-brick-600">
+                ● ناموجود — به‌زودی برشت می‌شود
+              </span>
+            ) : (
+              <span className={`ms-3 align-middle text-[11px] font-semibold ${stock <= 5 ? "text-brick-600" : "text-olive-600"}`}>
+                ● {stock <= 5 ? `فقط ${faDigits(stock)} عدد در انبار مانده` : "موجود در انبار برشت‌خانه"}
+              </span>
+            )}
+          </p>
+
+          {/* مشخصات */}
+          <div className="mt-7 grid grid-cols-2 gap-3">
+            {spec.map((s) => (
+              <div
+                key={s.label}
+                className="group rounded-xl border border-roast-900/10 bg-cream-50 p-4 shadow-card transition-all duration-300 hover:border-gold-600/50"
+              >
+                <p className="flex items-center gap-2 text-[11px] font-bold text-roast-600">
+                  <s.icon className="h-4 w-4 text-gold-600 transition-transform duration-300 group-hover:scale-110" />
+                  {s.label}
+                </p>
+                <p className="mt-1.5 text-sm font-extrabold text-roast-900">{s.value}</p>
+              </div>
+            ))}
+            {/* شدت برشت */}
+            <div className="col-span-2 flex items-center justify-between gap-4 rounded-xl border border-roast-900/10 bg-roast-900 p-4 text-cream-100 shadow-card">
+              <div>
+                <p className="flex items-center gap-2 text-[11px] font-bold text-cream-200/70">
+                  <FlameIcon className="h-4 w-4 text-gold-400" />
+                  شدت برشت: {product.details.roastLevel}
+                </p>
+                <p className="mt-1.5 text-xs text-cream-200/60">
+                  روی پاکت با دانه‌های طلایی نشان داده می‌شود
+                </p>
+              </div>
+              <span className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <span
+                    key={i}
+                    className={`h-4 w-4 rounded-full ${i <= product.details.intensity ? "bg-gold-500" : "bg-cream-100/20"}`}
+                  />
+                ))}
+              </span>
+            </div>
+          </div>
+
+          {/* نت‌های طعمی */}
+          <div className="mt-6">
+            <p className="text-xs font-bold text-roast-600">نت‌های طعمی این لات:</p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {product.details.tastingNotes.map((n) => (
+                <span
+                  key={n}
+                  className="rounded-full border border-gold-600/35 bg-gold-500/12 px-4 py-1.5 text-xs font-bold text-gold-700 transition-colors hover:bg-gold-500/25"
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* تعداد + افزودن */}
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="flex items-center rounded-full border-2 border-roast-900/15 bg-cream-50 shadow-card">
+              <button
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                disabled={qty <= 1}
+                aria-label="کاهش تعداد"
+                className="grid h-12 w-12 place-items-center rounded-full text-roast-800 transition-all hover:text-brick-600 active:scale-90 disabled:opacity-25 disabled:hover:text-roast-800"
+              >
+                <MinusIcon className="h-4.5 w-4.5" />
+              </button>
+              <span key={qty} className="animate-pop w-10 text-center text-lg font-extrabold text-roast-900">
+                {faDigits(qty)}
+              </span>
+              <button
+                onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+                disabled={qty >= maxQty}
+                aria-label="افزایش تعداد"
+                className="grid h-12 w-12 place-items-center rounded-full text-roast-800 transition-all hover:text-olive-600 active:scale-90 disabled:opacity-25 disabled:hover:text-roast-800"
+              >
+                <PlusIcon className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => onAdd(product, qty)}
+              disabled={soldOut}
+              className="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-gold-600 px-6 py-3.5 text-sm font-bold text-roast-950 shadow-[0_12px_28px_-10px_rgb(168_124_78/0.8)] transition-all duration-300 hover:bg-gold-500 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-roast-900/20 disabled:text-roast-900/50 disabled:shadow-none min-w-52"
+            >
+              <CartIcon className="h-5 w-5" />
+              {soldOut ? "اتمام موجودی" : `افزودن به سبد — ${formatToman(product.price * qty)}`}
+            </button>
+          </div>
+          {qty >= maxQty && !soldOut && (
+            <p className="mt-2.5 text-xs font-semibold text-brick-600">
+              حداکثر {faDigits(maxQty)} عدد از این لات قابل سفارش است.
+            </p>
+          )}
+
+          {/* اعتماد */}
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-roast-900/10 pt-6 text-xs font-semibold text-roast-600">
+            <span className="flex items-center gap-2">
+              <TruckIcon className="h-4.5 w-4.5 text-gold-700" /> ارسال ۲۴ تا ۴۸ ساعته
+            </span>
+            <span className="flex items-center gap-2">
+              <ShieldIcon className="h-4.5 w-4.5 text-gold-700" /> ضمانت اصالت دانه
+            </span>
+            <span className="flex items-center gap-2">
+              <PackageIcon className="h-4.5 w-4.5 text-gold-700" /> سوپاپ تازه‌نگهدار
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════ نظرات مشتریان ═══════════ */}
+      <section id="reviews" className="mt-16 scroll-mt-44 grid gap-8 lg:grid-cols-[minmax(0,320px)_1fr]">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-bold text-gold-700">
+            <span className="h-px w-8 bg-gold-600" />
+            دیدگاه خریداران
+          </p>
+          <h2 className="font-display mt-3 text-3xl text-roast-900">نظرات مشتریان</h2>
+
+          <div className="mt-5 rounded-xl border border-roast-900/10 bg-roast-900 p-6 text-cream-100 shadow-lift">
+            <div className="flex items-end gap-3">
+              <span className="font-display text-5xl leading-none text-gold-400">
+                {faDigits(product.rating.toFixed(1))}
+              </span>
+              <div className="pb-1">
+                <Stars rating={product.rating} size="h-4.5 w-4.5" />
+                <p className="mt-1.5 text-[11px] text-cream-200/60">
+                  از مجموع {faDigits(product.reviews)} نظر ثبت‌شده
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 border-t border-gold-500/15 pt-4 text-xs leading-6 text-cream-200/70">
+              همه‌ی نظرات پس از تأیید خرید، بدون دستکاری منتشر می‌شوند.
+            </p>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          {/* فرم ثبت نظر با عکس */}
+          <div className="animate-fade-up rounded-xl border-2 border-dashed border-gold-600/40 bg-cream-50 p-5 shadow-card dark:border-gold-500/30 dark:bg-roast-800">
+            <h3 className="font-display text-xl text-roast-900 dark:text-cream-50">تجربه‌ی شما از این لات؟</h3>
+            <div className="mt-3.5 grid gap-3.5 sm:grid-cols-2">
+              <input
+                value={reviewForm.author}
+                onChange={(e) => setReviewForm((f) => ({ ...f, author: e.target.value }))}
+                placeholder="نام شما"
+                aria-label="نام نویسنده‌ی نظر"
+                className="rounded-xl border border-roast-900/15 bg-cream-100 px-4 py-3 text-sm transition-all focus:border-gold-600 focus:outline-none dark:border-gold-500/20 dark:bg-roast-900 dark:text-cream-100"
+              />
+              {/* ستاره‌های انتخابی */}
+              <div className="flex items-center gap-1 rounded-xl border border-roast-900/15 bg-cream-100 px-4 py-2.5 dark:border-gold-500/20 dark:bg-roast-900" role="radiogroup" aria-label="امتیاز">
+                <span className="ms-auto me-1 text-[11px] font-bold text-roast-600 dark:text-cream-200/70">
+                  {reviewForm.rating ? `${faDigits(reviewForm.rating)} از ۵` : "امتیاز بدهید"}
+                </span>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setReviewForm((f) => ({ ...f, rating: i }))}
+                    aria-label={`${faDigits(i)} ستاره`}
+                    className="p-0.5 transition-transform hover:scale-125 active:scale-95"
+                  >
+                    <StarIcon className={`h-6 w-6 transition-colors ${i <= reviewForm.rating ? "text-gold-500" : "text-roast-900/15 dark:text-cream-100/20"}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <textarea
+              value={reviewForm.text}
+              onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))}
+              rows={3}
+              placeholder="طعم، عطر، روش دمی که استفاده کردید…"
+              aria-label="متن نظر"
+              className="mt-3.5 w-full resize-none rounded-xl border border-roast-900/15 bg-cream-100 px-4 py-3 text-sm leading-7 transition-all focus:border-gold-600 focus:outline-none dark:border-gold-500/20 dark:bg-roast-900 dark:text-cream-100"
+            />
+
+            <div className="mt-3.5 flex flex-wrap items-center gap-3">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void onPickPhoto(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-2 rounded-full border border-roast-900/15 px-4 py-2.5 text-xs font-bold text-roast-700 transition-all hover:border-gold-600 hover:text-gold-700 active:scale-95 dark:border-gold-500/25 dark:text-cream-200"
+              >
+                <CameraIcon className="h-4.5 w-4.5" />
+                عکس فنجان‌تان
+              </button>
+              {reviewForm.photo && (
+                <span className="animate-pop relative">
+                  <img src={reviewForm.photo} alt="پیش‌نمایش عکس" className="h-14 w-14 rounded-lg border-2 border-gold-500 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setReviewForm((f) => ({ ...f, photo: null }))}
+                    aria-label="حذف عکس"
+                    className="absolute -top-1.5 -end-1.5 grid h-5 w-5 place-items-center rounded-full bg-brick-600 text-cream-50 transition-transform hover:scale-110"
+                  >
+                    <CloseIcon className="h-3 w-3" strokeWidth={2.6} />
+                  </button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => void submitReview()}
+                disabled={savingReview}
+                className="ms-auto rounded-full bg-gold-600 px-6 py-2.5 text-xs font-extrabold text-roast-950 transition-all hover:bg-gold-500 active:scale-95 disabled:opacity-60"
+              >
+                {savingReview ? "در حال ثبت…" : "ثبت نظر"}
+              </button>
+            </div>
+            {reviewError && <p className="animate-fade-up mt-3 text-[11px] font-bold text-brick-600">{reviewError}</p>}
+          </div>
+
+          {/* فهرست نظرات */}
+          <ul className="mt-5 space-y-4">
+            {mergedReviews.map((r, idx) => {
+              const hasVoted = voted[r.id];
+              return (
+                <li
+                  key={r.id}
+                  className="animate-fade-up rounded-xl border border-roast-900/10 bg-cream-50 p-5 shadow-card transition-all duration-300 hover:border-gold-600/40 hover:shadow-lift dark:border-gold-500/10 dark:bg-roast-800"
+                  style={{ animationDelay: `${Math.min(idx, 4) * 0.08}s` }}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="font-display grid h-11 w-11 place-items-center rounded-full bg-gold-500/25 text-xl text-gold-700 dark:text-gold-400">
+                        {r.author.trim()[0]}
+                      </span>
+                      <div>
+                        <p className="text-sm font-extrabold text-roast-900 dark:text-cream-50">
+                          {r.author}
+                          {r.verified && (
+                            <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-olive-600/12 px-2 py-0.5 text-[10px] font-bold text-olive-600 dark:text-olive-500">
+                              <CheckIcon className="h-3 w-3" strokeWidth={3} />
+                              خرید تأییدشده
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-roast-600 dark:text-cream-200/60">{r.date}</p>
+                      </div>
+                    </div>
+                    <Stars rating={r.rating} size="h-3.5 w-3.5" />
+                  </div>
+
+                  {r.photo && (
+                    <button
+                      onClick={() => setLightbox(r.photo!)}
+                      className="group/photo relative mt-3.5 block overflow-hidden rounded-lg"
+                      aria-label="نمایش بزرگ عکس"
+                    >
+                      <img
+                        src={r.photo}
+                        alt={`عکس فنجان از ${r.author}`}
+                        loading="lazy"
+                        className="h-28 w-40 object-cover transition-transform duration-500 group-hover/photo:scale-110"
+                      />
+                      <span className="absolute inset-0 grid place-items-center bg-roast-950/0 text-cream-50 opacity-0 transition-all duration-300 group-hover/photo:bg-roast-950/35 group-hover/photo:opacity-100">
+                        <CameraIcon className="h-6 w-6" />
+                      </span>
+                    </button>
+                  )}
+
+                  <p className="mt-3.5 text-sm leading-8 text-roast-700 dark:text-cream-200/85">{r.text}</p>
+                  <button
+                    onClick={() => setVoted((v) => ({ ...v, [r.id]: true }))}
+                    disabled={hasVoted}
+                    className={`mt-3.5 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-300 active:scale-95 ${
+                      hasVoted
+                        ? "bg-olive-600/15 text-olive-600 dark:text-olive-500"
+                        : "bg-roast-900/6 text-roast-600 hover:bg-gold-500/20 hover:text-gold-700 dark:bg-cream-100/10 dark:text-cream-200/70"
+                    }`}
+                  >
+                    {hasVoted ? <CheckIcon className="h-3.5 w-3.5" /> : null}
+                    {hasVoted ? "رأی شما ثبت شد" : "مفید بود"} ({faDigits(r.helpful + (hasVoted ? 1 : 0))})
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* لایت‌باکس عکس نظر */}
+      {lightbox && (
+        <button
+          onClick={() => setLightbox(null)}
+          className="animate-fade-up fixed inset-0 z-[75] grid place-items-center bg-roast-950/90 p-6 backdrop-blur-sm"
+          aria-label="بستن نمایشگر عکس"
+        >
+          <img src={lightbox} alt="عکس بزرگ فنجان مشتری" className="max-h-[82dvh] max-w-full rounded-xl shadow-lift ring-2 ring-gold-500/40" />
+        </button>
+      )}
+
+      {/* ═══════════ شاید بپسندید ═══════════ */}
+      <section className="mt-16">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-bold text-gold-700">
+              <span className="h-px w-8 bg-gold-600" />
+              پیشنهاد برشت‌خانه
+            </p>
+            <h2 className="font-display mt-3 text-3xl text-roast-900">شاید این‌ها را هم بپسندید</h2>
+          </div>
+          <button
+            onClick={onBack}
+            className="hidden rounded-full border border-roast-900/15 px-5 py-2.5 text-xs font-bold text-roast-700 transition-all hover:border-gold-600 hover:text-gold-700 sm:block"
+          >
+            دیدن همه‌ی محصولات
+          </button>
+        </div>
+
+        <div className="mt-7 grid gap-5 sm:grid-cols-3">
+          {related.map((p) => (
+            <article
+              key={p.id}
+              className="group overflow-hidden rounded-xl border border-roast-900/8 bg-cream-50 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift"
+            >
+              <button
+                onClick={() => onOpenProduct(p.id)}
+                className="block aspect-[4/3] w-full overflow-hidden bg-cream-200"
+                aria-label={`مشاهده‌ی ${p.name}`}
+              >
+                <img
+                  src={p.image}
+                  alt={p.name}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.07]"
+                />
+              </button>
+              <div className="p-4">
+                <h3 className="line-clamp-1 text-sm font-extrabold text-roast-900">
+                  <button
+                    onClick={() => onOpenProduct(p.id)}
+                    className="transition-colors hover:text-gold-700"
+                  >
+                    {p.name}
+                  </button>
+                </h3>
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <p className="text-sm font-extrabold text-gold-700">
+                    {formatNumber(p.price)}
+                    <span className="text-[10px] font-bold text-gold-700/75"> تومان</span>
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => onAdd(p, 1)}
+                      aria-label={`افزودن ${p.shortName} به سبد`}
+                      className="grid h-9 w-9 place-items-center rounded-full bg-roast-800 text-cream-50 transition-all duration-300 hover:bg-gold-600 hover:text-roast-950 active:scale-90"
+                    >
+                      <CartIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onOpenProduct(p.id)}
+                      className="rounded-full border border-roast-900/15 px-3.5 py-2 text-[11px] font-bold text-roast-700 transition-all hover:border-gold-600 hover:text-gold-700 active:scale-95"
+                    >
+                      مشاهده
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
